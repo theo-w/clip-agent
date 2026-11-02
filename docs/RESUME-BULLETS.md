@@ -28,14 +28,14 @@
     <span><b>4</b> 条端到端演示链路</span>
   </div>
   <div class="links">
-    <a href="https://github.com/theo-w/...">GitHub 仓库 →</a>
+    <a href="https://github.com/theo-w/clip-agent">GitHub 仓库 →</a>
     <a href="...">SDD →</a>
     <a href="...">复盘 →</a>
   </div>
 </section>
 ```
 
-（GitHub 仓库地址待你建仓后替换；仓库里已有 `README.md`、`docs/SDD.md`、`docs/RETRO.md`、`docs/DEMO-SCRIPT.md`。）
+（仓库：https://github.com/theo-w/clip-agent —— 包含 `README.md`、`docs/SDD.md`、`docs/RETRO.md`、`docs/DEMO-SCRIPT.md`、`docs/USER-RESEARCH.md` 等全部文档。）
 
 ## JD 关键词命中检查表
 
