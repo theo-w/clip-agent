@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clip-agent"
+version = "0.1.0"
+description = "剪辑辅助 Agent：面向剪映 PC 创作者的 AI 剪辑辅助工具（自然语言 → Skill 编排 → 预览确认）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+clip-agent = "clip_agent.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["clip_agent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
