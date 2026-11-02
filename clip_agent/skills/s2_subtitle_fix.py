@@ -190,10 +190,12 @@ class SubtitleFixSkill(Skill):
         )
 
     def run(self, ctx: ExecContext, params: dict) -> SkillResult:
-        if not ctx.subtitle_path:
-            return self.fail("缺少字幕素材（--subtitle 指定 SRT 文件）")
+        # 字幕来源：显式 --subtitle 优先，其次上游 S006 转写结果
+        subtitle_path = ctx.subtitle_path or ctx.get("subtitle_text")
+        if not subtitle_path:
+            return self.fail("缺少字幕素材（--subtitle 指定 SRT 文件，或先运行 S006 语音转写）")
         try:
-            entries = parse_srt(ctx.subtitle_path)
+            entries = parse_srt(str(subtitle_path))
         except Exception as exc:
             return self.fail(f"字幕解析失败：{exc}")
         if not entries:

@@ -8,3 +8,4 @@ build/
 output/
 data/
 .DS_Store
+.claude/launch.json

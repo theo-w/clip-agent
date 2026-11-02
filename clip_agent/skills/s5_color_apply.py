@@ -100,12 +100,36 @@ class ColorApplySkill(Skill):
         chain = build_filter_chain(color)
         if not chain:
             return self.fail("有效调色参数为空")
-        return self.success({
+        outputs = {
             "color_params": {k: round(float(v), 3) for k, v in color.items()},
             "filter_chain": chain,
             "jianying_mapping": jianying_mapping(color),
             "source_note": source_note,
-        })
+        }
+        # 预览阶段只抽一帧做对比图（O(1) 帧成本），确认应用后才渲染整片
+        if ctx.media_path and ctx.workdir:
+            compare = self._compare_image(ctx, chain)
+            if compare:
+                outputs["compare_image"] = compare
+        return self.success(outputs)
+
+    def _compare_image(self, ctx: ExecContext, chain: str) -> str:
+        """中间帧左右对比图：左原片帧 | 右调色后；生成失败降级为无图。"""
+        try:
+            mid = max(0.0, analyzer.probe_duration(str(ctx.media_path)) / 2)
+            out = Path(ctx.workdir) / "compare.jpg"
+            analyzer.run_cmd([
+                "ffmpeg", "-y", "-hide_banner",
+                "-ss", f"{mid:.2f}", "-i", str(ctx.media_path),
+                "-frames:v", "1",
+                "-filter_complex",
+                f"[0:v]split=2[base][graded];[graded]{chain}[g];"
+                "[base][g]hstack=inputs=2",
+                "-q:v", "3", str(out),
+            ])
+            return out.name
+        except analyzer.MediaToolError:
+            return ""
 
     def render(self, ctx: ExecContext, params: dict, outputs: dict,
                on_progress=None) -> list:

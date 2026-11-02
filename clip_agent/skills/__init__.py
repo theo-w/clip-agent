@@ -1,4 +1,4 @@
-"""Skill 仓库：内置 5 个原子技能（SDD 模块 2 & 7），导入本包即完成注册。
+"""Skill 仓库：内置 6 个原子技能（SDD 模块 2 & 7），导入本包即完成注册。
 
 启停状态持久化在 data/skill_state.json，新增 Skill 只需定义类并加入
 BUILTIN_SKILLS，不需要改动调度核心。
@@ -14,6 +14,7 @@ from .s2_subtitle_fix import SubtitleFixSkill
 from .s3_highlight import HighlightSkill
 from .s4_bgm_align import BgmAlignSkill
 from .s5_color_apply import ColorApplySkill
+from .s6_transcribe import TranscribeSkill
 
 BUILTIN_SKILLS = [
     SilenceCutSkill,
@@ -21,6 +22,7 @@ BUILTIN_SKILLS = [
     HighlightSkill,
     BgmAlignSkill,
     ColorApplySkill,
+    TranscribeSkill,
 ]
 
 

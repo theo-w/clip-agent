@@ -24,6 +24,11 @@ from .core.models import ExecContext
 from .core.registry import REGISTRY
 from .core.scheduler import Scheduler
 from .metrics.tracker import MetricsTracker
+from .preview.html_report import (
+    collect_recent_runs,
+    write_metrics_html,
+    write_run_html,
+)
 from .preview.snapshot import PreviewSnapshot
 
 SOURCE_LABEL = {"rule": "规则路由", "llm": "本地模型路由", "combo": "组合方案模板"}
@@ -151,6 +156,17 @@ def _render_all(plan, report, ctx) -> list:
     return produced
 
 
+def _default_workdir() -> Path:
+    """默认输出目录：秒级时间戳；同秒冲突追加序号（脚本连续运行常见）。"""
+    base = f"output/run_{datetime.now():%Y%m%d_%H%M%S}"
+    path = Path(base)
+    n = 2
+    while path.exists():
+        path = Path(f"{base}_{n}")
+        n += 1
+    return path
+
+
 def _cmd_run(args) -> int:
     for label, p in (("素材", args.media), ("字幕", args.subtitle), ("BGM", args.bgm)):
         if p and not Path(p).exists():
@@ -161,7 +177,7 @@ def _cmd_run(args) -> int:
     router = IntentRouter()
     scheduler = Scheduler(tracker=tracker)
 
-    workdir = Path(args.workdir or f"output/run_{datetime.now():%Y%m%d_%H%M%S}")
+    workdir = Path(args.workdir) if args.workdir else _default_workdir()
     ctx = ExecContext(
         media_path=str(Path(args.media).resolve()) if args.media else None,
         subtitle_path=str(Path(args.subtitle).resolve()) if args.subtitle else None,
@@ -219,6 +235,8 @@ def _cmd_run(args) -> int:
     if not report.ok:
         print(f"\n⚠ 执行中断：{report.error}")
         print("  已保留前面完成的结果；可调整参数后重试。")
+        html_path = write_run_html(workdir, plan, report, decision="failed")
+        print(f"  HTML 报告：{html_path}")
         tracker.track_decision(
             [s.skill_id for s in plan.steps], "discarded", note="execution_failed"
         )
@@ -246,6 +264,8 @@ def _cmd_run(args) -> int:
         print(f"\n◆ 预览报告：{report_path}")
         if not report.ok:
             print(f"\n⚠ 执行中断：{report.error}")
+            html_path = write_run_html(workdir, plan, report, decision="failed")
+            print(f"  HTML 报告：{html_path}")
             tracker.track_decision(
                 [s.skill_id for s in plan.steps], "discarded", note="execution_failed"
             )
@@ -274,6 +294,8 @@ def _cmd_run(args) -> int:
         print("\n◆ 已生成预览（非交互模式，未记录采纳/放弃；可用 --yes 直接采纳）")
     else:
         print("\n◆ 已放弃本次 AI 结果，原始素材未做任何修改。")
+    html_path = write_run_html(workdir, plan, report, decision=decision)
+    print(f"\n◆ HTML 报告：{html_path}")
     tracker.track_decision([s.skill_id for s in plan.steps], decision)
     return 0
 
@@ -393,7 +415,15 @@ def _cmd_assets(args) -> int:
 
 
 def _cmd_report(args) -> int:
-    print(MetricsTracker().render_report_md())
+    tracker = MetricsTracker()
+    print(tracker.render_report_md())
+    if getattr(args, "html", False):
+        path = write_metrics_html(
+            "output/report.html",
+            tracker.report(),
+            collect_recent_runs("output"),
+        )
+        print(f"\n◆ HTML 仪表盘：{path}")
     return 0
 
 
@@ -451,7 +481,9 @@ def build_parser() -> argparse.ArgumentParser:
     a_imp = a_sub.add_parser("import", help="导入 .clipasset 文件（校验依赖后入库）")
     a_imp.add_argument("file")
 
-    sub.add_parser("report", help="输出评测报表")
+    report_cmd = sub.add_parser("report", help="输出评测报表")
+    report_cmd.add_argument("--html", action="store_true",
+                            help="同时生成 HTML 仪表盘 output/report.html")
     return p
 
 

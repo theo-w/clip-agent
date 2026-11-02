@@ -100,6 +100,22 @@ SEED_PRESETS = [
         "created_at": "", "updated_at": "", "version": 1, "favorites": 0,
         "is_favorite": False, "is_public": True, "history": [],
     },
+    {
+        "asset_id": "combo003",
+        "asset_type": "skill_combo",
+        "name": "口播粗剪流水线",
+        "params": {
+            "steps": ["S006", "S002", "S001"],
+            "step_params": {
+                "S006": {"language": "zh"},
+                "S002": {"max_line_chars": 16},
+                "S001": {"min_duration": 0.6},
+            },
+        },
+        "tags": ["口播", "粗剪", "ASR"],
+        "created_at": "", "updated_at": "", "version": 1, "favorites": 0,
+        "is_favorite": False, "is_public": True, "history": [],
+    },
 ]
 
 
@@ -113,7 +129,14 @@ class AssetLibrary:
         if not self.path.exists():
             self._dump([dict(p) for p in SEED_PRESETS])  # 首次运行播种示例预设
             return [dict(p) for p in SEED_PRESETS]
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        rows = json.loads(self.path.read_text(encoding="utf-8"))
+        # 版本升级时补齐新增的内置示例（不覆盖用户已有资产）
+        existing = {r["asset_id"] for r in rows}
+        missing = [dict(p) for p in SEED_PRESETS if p["asset_id"] not in existing]
+        if missing:
+            rows += missing
+            self._dump(rows)
+        return rows
 
     def _dump(self, rows: list) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

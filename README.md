@@ -8,10 +8,11 @@
 ## 功能总览
 
 - **自然语言指令**：`识别视频静音片段并自动裁剪`、`批量校对所有字幕错别字，统一字体样式`、`筛选高光镜头，匹配BGM卡点`
-- **5 个内置原子 Skill**（S001–S005）：独立封装、参数可配、可上下线，新增 Skill 不需要改调度核心
+- **6 个内置原子 Skill**（S001–S006）：独立封装、参数可配、可上下线，新增 Skill 不需要改调度核心；S006 语音转写为可选能力（需安装 `[asr]` 可选依赖）
 - **创作资产库**：调色预设 / 字幕模板 / Skill 组合方案，支持检索、收藏、版本回滚
 - **资产流通（V1.1）**：导出 `.clipasset` 分享文件 + 分享码 → 创作者社群分发 → 导入即用（依赖校验、幂等判重、参数变更自动升级版本）
-- **评测埋点**：Skill 调用链路、耗时、采纳/修改/放弃行为 → 效率/质量/生态指标报表
+- **双形态预览报告**：Markdown（可版本控制）+ HTML（可视化，单文件可分享，无需服务器）
+- **评测埋点**：Skill 调用链路、耗时、采纳/修改/放弃行为 → 效率/质量/生态指标报表（文本 + HTML 仪表盘）
 - **本地优先**：意图路由支持 Ollama 等本地模型（OpenAI 兼容接口，可选）；未配置时自动降级为关键词规则路由，纯本地也能跑
 - **零第三方依赖**：Python 标准库实现，仅依赖系统 `ffmpeg` / `ffprobe`
 
@@ -43,7 +44,13 @@ brew install ffmpeg            # macOS；Windows 见 ffmpeg.org
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
+# 可选：本地语音转写（Apple Silicon + Python≥3.10 自动装 mlx-whisper，其他平台装 faster-whisper）
+pip install -e ".[asr]"
+
 python scripts/make_demo_fixture.py    # 生成演示素材（含静音的视频、带问题的字幕、BGM）
+python scripts/make_speech_fixture.py  # 可选（macOS）：生成中文口播素材，用于演示语音转写
+
+bash scripts/run_demo.sh               # 一键跑完 4 条核心演示链路 + 评测报表
 ```
 
 ### 示例：一次完整调用
@@ -67,6 +74,9 @@ python -m clip_agent run "" --combo combo001 --media output/demo/demo.mp4 --subt
 
 # 6) 高光卡点流水线（S003 高光筛选 → S004 BGM 对齐）
 python -m clip_agent run "" --combo combo002 --media output/demo/demo.mp4 --bgm output/demo/bgm.m4a --yes
+
+# 7) 口播粗剪流水线（S006 语音转写 → S002 字幕校对 → S001 静音裁切；需安装 [asr]）
+python -m clip_agent run "" --combo combo003 --media output/demo/speech.mp4 --yes
 ```
 
 不加 `--yes` 时进入交互决策：**[1] 应用 / [2] 修改参数重跑 / [3] 放弃**。
@@ -80,7 +90,14 @@ python -m clip_agent assets show color001   # 资产详情（参数 / 分享码 
 python -m clip_agent assets export color001 --out x.clipasset   # 导出分享文件
 python -m clip_agent assets import x.clipasset                  # 导入即用（校验 Skill 依赖）
 python -m clip_agent report                  # 评测报表：效率/质量/生态指标
+python -m clip_agent report --html           # 生成 HTML 仪表盘 output/report.html
 ```
+
+### HTML 报告
+
+每次 `run` 都会在输出目录生成 `report.html`（与 `report.md` 同源）：包含意图/步骤、各 Skill 的结构化结果、调色前后对比图、产物文件链接与决策状态徽章。纯静态文件、零第三方依赖、图片 base64 内嵌，可直接双击用浏览器打开，也可以单文件发给别人。
+
+`report --html` 生成 `output/report.html` 仪表盘：效率/质量/生态指标与最近运行列表（可点进各次运行的 HTML 报告）。
 
 分享码由资产内容哈希生成（同内容同码）：同码同参数重复导入幂等，同码新参数自动升级为本地新版本（历史可回滚）；依赖的 Skill 未注册/停用/版本不满足时导入会明确报错，不静默入库。
 
@@ -92,7 +109,8 @@ python -m clip_agent report                  # 评测报表：效率/质量/生�
 | S002 | 字幕批量校对与样式统一 | SRT 字幕 | 修正后字幕 fixed.srt、问题清单、样式参数 |
 | S003 | 高光镜头识别筛选 | 视频+音频 | 高光片段列表（含评分，V1 启发式） |
 | S004 | 音频 BGM 时长对齐 | BGM | 对齐方案（裁剪/循环+淡出，可渲染音频） |
-| S005 | 批量调色参数套用 | 视频+预设 | ffmpeg 滤镜链、剪映「调节」面板参数映射（可渲染） |
+| S005 | 批量调色参数套用 | 视频+预设 | ffmpeg 滤镜链、一帧预览对比图、剪映「调节」面板参数映射（可渲染） |
+| S006 | 语音转写生成字幕（可选） | 音视频 | 转写 SRT（本地 Whisper：mlx-whisper / faster-whisper，未安装时明确提示） |
 
 ## 设计原则（人机边界）
 
@@ -118,10 +136,10 @@ python -m clip_agent report                  # 评测报表：效率/质量/生�
 ```
 clip_agent/
 ├── core/        # 意图路由、调度引擎、注册表、数据模型
-├── skills/      # Skill 基类 + S001~S005（可插拔，注册即生效）
+├── skills/      # Skill 基类 + S001~S006（可插拔，注册即生效）
 ├── media/       # 素材识别：静音/切变/响度/SRT 解析
 ├── assets/      # 创作资产库：预设 CRUD、版本回滚、导出/导入流通
-├── preview/     # 预览快照：report.md / preview.json
+├── preview/     # 预览快照：report.md / preview.json / report.html
 ├── metrics/     # 埋点与评测报表
 └── __main__.py  # CLI：run / skills / assets / report
 data/            # 运行时生成：资产库、埋点、Skill 开关状态
@@ -132,7 +150,7 @@ tests/           # pytest（ffmpeg 缺失时音视频用例自动跳过）
 ## 路线图
 
 - **V1.0**：5 个基础 Skill、本地调度、个人资产库、基础评测
-- **V1.1**：✅ 资产流通（导出 `.clipasset` / 分享码 / 导入即用）+ ✅ Skill 组合模板（资产驱动执行计划）；待做：资产分享社区、多模态高光精排
+- **V1.1**：✅ 资产流通（导出 `.clipasset` / 分享码 / 导入即用）+ ✅ Skill 组合模板（资产驱动执行计划）+ ✅ S006 语音转写（可选依赖）+ ✅ 双形态预览（HTML 报告与评测仪表盘）；待做：资产分享社区、多模态高光精排
 - **V1.2**：对接剪映开放 API，直接与剪映工程联动
 
 详细设计见 **[docs/SDD.md](docs/SDD.md)**。
@@ -141,9 +159,16 @@ tests/           # pytest（ffmpeg 缺失时音视频用例自动跳过）
 
 | 文档 | 内容 |
 |---|---|
+| [docs/USAGE.md](docs/USAGE.md) | **使用指南**：使用模型、CLI 速查、每个 Skill 的输入/参数/产出/示例、资产库、FAQ |
 | [docs/SDD.md](docs/SDD.md) | 软件设计文档（需求、模块设计、边界约束、指标） |
 | [docs/RETRO.md](docs/RETRO.md) | 项目复盘：JD 映射、竞品定位、缺口分析与验证计划、面试 Q&A 预演 |
 | [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md) | 3 分钟现场演示脚本（含应急方案） |
 | [docs/RESUME-BULLETS.md](docs/RESUME-BULLETS.md) | 按目标 JD 起草的简历 bullet 与关键词命中表 |
 | [docs/USER-RESEARCH.md](docs/USER-RESEARCH.md) | 创作者需求案头研究（公开证据汇总，非访谈验证） |
+| [docs/COMPETITIVE-GITHUB.md](docs/COMPETITIVE-GITHUB.md) | GitHub 竞品调研：12 个仓库实测 star、可借鉴工程方案与差异化定位 |
 | [docs/ECOSYSTEM-PLAN.md](docs/ECOSYSTEM-PLAN.md) | 创作资产生态规划（沉淀 → 流通 → 激励的三阶段路径） |
+
+## 依赖与许可
+
+- 运行时依赖：Python 标准库 + 系统 `ffmpeg`/`ffprobe`（`pyproject.toml` 中 `dependencies = []`）；语音转写为可选 extra（`[asr]`）；开发依赖仅 `pytest`
+- License：[MIT](LICENSE)

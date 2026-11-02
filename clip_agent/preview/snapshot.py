@@ -82,7 +82,7 @@ class PreviewSnapshot:
         header = f"## {r['skill_id']} 完成（{r['duration']:.2f}s）"
         renderer = {
             "S001": self._r_s1, "S002": self._r_s2, "S003": self._r_s3,
-            "S004": self._r_s4, "S005": self._r_s5,
+            "S004": self._r_s4, "S005": self._r_s5, "S006": self._r_s6,
         }.get(r["skill_id"])
         body = renderer(out) if renderer else [
             "```json", json.dumps(out, ensure_ascii=False, indent=2), "```"
@@ -163,11 +163,30 @@ class PreviewSnapshot:
             f"- 尾部淡出：{plan.get('fade_out')}s",
         ]
 
+    def _r_s6(self, out: dict) -> list:
+        lines = [
+            f"转写后端：{out.get('backend', '-')}（模型 `{out.get('asr_model', '-')}`），"
+            f"识别出 **{out.get('segment_count', 0)}** 条字幕；转写字幕：`transcribed.srt`。",
+            "",
+        ]
+        preview = out.get("segments_preview", [])
+        if preview:
+            lines += ["| # | 开始 | 结束 | 文本 |", "|---|---|---|---|"]
+            for i, s in enumerate(preview, 1):
+                text = (s.get("text") or "")[:24].replace("\n", " ")
+                lines.append(f"| {i} | {_ts(s['start'])} | {_ts(s['end'])} | {text} |")
+        return lines
+
     def _r_s5(self, out: dict) -> list:
         mapping = out.get("jianying_mapping", {})
         lines = [
             f"调色参数来源：{out.get('source_note') or '内联参数'}",
             "",
+        ]
+        if out.get("compare_image"):
+            lines.append(f"调色效果对比图：`{out['compare_image']}`（左：原片帧 ｜ 右：调色后）")
+            lines.append("")
+        lines += [
             "ffmpeg 滤镜链：",
             "```",
             out.get("filter_chain", ""),
