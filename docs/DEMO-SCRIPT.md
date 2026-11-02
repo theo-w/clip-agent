@@ -52,6 +52,7 @@ ls output/demo/                              # 确认 demo.mp4 / demo.srt / bgm.
 | "没有字幕的素材怎么办" | `python -m clip_agent run "先语音转写并校对字幕" --media output/demo/speech.mp4 --yes` | 讲 ASR 是**可选依赖**、本地推理；未安装时明确提示安装方式、核心链路零影响。彩蛋：small 模型把"教"听成"叫"——规则校对修不了同音错字，这正是可选 LLM 润色的边界，也是"规则可解释、模型做增强"的分工 |
 | "模型在哪用" | `python -m clip_agent skills --json` | Skill 清单即模型路由的 prompt 输入（manifest） |
 | "资产怎么分享给别人" | `assets export color001 --out x.clipasset` → `assets import x.clipasset` | V1.1 流通：分享码内容哈希生成、导入校验 Skill 依赖、同码幂等判重——"资产是参数不是代码，没有可执行内容，分享链路安全"（呼应 JD"沉淀与分发"） |
+| "资产多了怎么发现好用的" | `python -m clip_agent assets discover --html` 打开 `output/square.html` | P2 发现机制本地版：质量分 = 50%×去重素材复用 + 30%×收藏 + 20%×导入；复用按独立素材去重防刷；页面上有官方精选/社区热门/待验证三种来源标识与周复用资产数（生态北极星指标）。在线广场/创作者主页需平台承载，诚实标注为下一步 |
 
 ## 应急方案
 

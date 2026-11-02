@@ -4,6 +4,7 @@
 - skill_run：Skill 调用、耗时、成败、错误信息
 - decision：用户决策（adopted 采纳 / modified 修改重跑 / discarded 放弃）
 - asset：资产动作（save 保存 / use 复用 / favorite 收藏 / export 导出 / import 导入）
+  其中 use 事件可带 material（素材名），供资产广场按独立素材去重计分
 
 报表输出 SDD 6.1 定义的三大类指标：效率 / 质量 / 生态。
 """
@@ -51,12 +52,16 @@ class MetricsTracker:
             "note": note,
         })
 
-    def track_asset(self, action: str, asset_id: str) -> None:
-        self._append({
+    def track_asset(self, action: str, asset_id: str, material: str = "") -> None:
+        event = {
             "type": "asset",
             "action": action,  # save | use | favorite | rollback | export | import
             "asset_id": asset_id,
-        })
+        }
+        # 复用事件记录素材名，供资产广场按「独立素材」去重计分（防同一素材刷复用）
+        if material:
+            event["material"] = material
+        self._append(event)
 
     # ---------------------------------------------------------------- 报表
 

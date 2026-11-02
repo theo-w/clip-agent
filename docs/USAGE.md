@@ -262,6 +262,23 @@ python -m clip_agent assets rollback color001 1           # 回滚到 v1
 - 同名保存会递增版本，可回滚
 - 数据文件：`data/assets.json`（本地）
 
+### 资产发现（`assets discover`，P2 本地先行版）
+
+资产广场按**质量分**排序，帮助从资产库里找到「被真实复用最多」的资产：
+
+```bash
+python -m clip_agent assets discover                  # 全部资产，按质量分排行
+python -m clip_agent assets discover --tag 口播       # 场景标签筛选
+python -m clip_agent assets discover --type skill_combo --limit 3
+python -m clip_agent assets discover --html           # 额外生成 output/square.html 广场页
+```
+
+- 质量分（0–100）= 50%×去重素材复用 + 30%×收藏 + 20%×导入（各维度封顶）；
+- **复用按独立素材去重**：同一素材反复应用同一资产只计 1 次，防止刷复用——这是后续社区榜单的防刷口径；
+- 来源标识：内置/公开资产为「官方精选」，本地资产有复用的为「社区热门」，零复用为「待验证」；
+- 「本周复用资产数」取自近 7 天埋点，对应生态北极星指标。
+- 质量分与榜单均为本地数据（`data/metrics.jsonl`），在线广场/跨设备榜单需平台承载。
+
 ## 8. 输出目录结构
 
 ```
@@ -275,6 +292,8 @@ output/run_20261102_185807/
 ├── transcribed.srt           # 转写字幕
 └── silence_cut.json          # 静音时间戳方案
 ```
+
+`output/report.html`（评测仪表盘）与 `output/square.html`（资产广场）分别在 `report --html` / `assets discover --html` 时生成。
 
 ## 9. 常见问题
 

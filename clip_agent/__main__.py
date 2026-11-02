@@ -5,6 +5,7 @@
   python -m clip_agent run "筛选高光镜头，匹配BGM卡点" --media v.mp4 --bgm b.m4a
   python -m clip_agent skills                # Skill 清单（--disable/--enable 上下线）
   python -m clip_agent assets list           # 资产库
+  python -m clip_agent assets discover       # 资产广场：质量分排行（--html 生成广场页）
   python -m clip_agent report               # 评测报表
 """
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 
 from . import __version__
 from . import skills as skills_pkg  # noqa: F401  导入即注册内置 Skill
+from .assets.discovery import rank, weekly_reused_assets
 from .assets.library import AssetLibrary, AssetNotFoundError
 from .assets.sharing import AssetImportError, export_asset, import_asset
 from .core.intent import IntentRouter, plan_from_combo
@@ -30,6 +32,7 @@ from .preview.html_report import (
     write_run_html,
 )
 from .preview.snapshot import PreviewSnapshot
+from .preview.square import write_square_html
 
 SOURCE_LABEL = {"rule": "规则路由", "llm": "本地模型路由", "combo": "组合方案模板"}
 
@@ -272,11 +275,12 @@ def _cmd_run(args) -> int:
             return 2
 
     # 资产复用埋点：仅在 S005 真正成功使用预设时计入
+    material = Path(args.media).name if args.media else ""
     if args.asset and any(r.ok and r.skill_id == "S005" for r in report.results):
-        tracker.track_asset("use", args.asset)
+        tracker.track_asset("use", args.asset, material=material)
     # 组合方案复用埋点：模板完整跑通才计入（失败/中断不计）
     if args.combo and report.ok:
-        tracker.track_asset("use", args.combo)
+        tracker.track_asset("use", args.combo, material=material)
 
     # ④ 应用（渲染成片）或放弃（原素材不变）
     if decision == "adopted":
@@ -321,6 +325,33 @@ def _cmd_skills(args) -> int:
     for r in rows:
         status = "启用" if r["is_enable"] else "停用"
         print(f"{r['skill_id']:<7}{status:<6}{r['name']:<24}{r['desc'][:46]}")
+    return 0
+
+
+def _cmd_asset_discover(args, lib, tracker) -> int:
+    """资产广场（P2 本地先行版）：按质量分排序展示可发现资产。"""
+    events = tracker.load_events()
+    now = datetime.now()
+    insights = rank(
+        lib, events, tag=args.tag or "", asset_type=args.type or "",
+        limit=args.limit or 0, now=now,
+    )
+    weekly = weekly_reused_assets(events, now=now)
+    print(f"◆ 资产广场（{len(insights)} 个资产 · 本周复用 {weekly} 个资产）")
+    if not insights:
+        print("（没有匹配的资产；可用 --tag / --type 筛选）")
+        return 0
+    print(f"\n{'质量分':<7}{'ID':<11}{'名称':<18}{'来源':<10}"
+          f"{'复用素材':<9}{'本周':<6}{'收藏':<5}{'导入':<5}标签")
+    for ins in insights:
+        print(f"{ins.score:<7.1f}{ins.asset.asset_id:<11}{ins.asset.name:<18}"
+              f"{ins.badge:<10}{ins.reuse:<9}{ins.weekly_reuse:<6}"
+              f"{ins.asset.favorites:<5}{ins.asset.installs:<5}"
+              f"{','.join(ins.asset.tags)}")
+    print("\n质量分 = 50%×去重素材复用 + 30%×收藏 + 20%×导入（0–100）；同素材重复复用只计一次")
+    if args.html:
+        path = write_square_html(insights, Path("output/square.html"), weekly, now=now)
+        print(f"◆ 资产广场 HTML：{path}")
     return 0
 
 
@@ -369,6 +400,9 @@ def _cmd_assets(args) -> int:
             return 1
         print(f"✓ 已回滚到 v{args.version} 的参数（当前版本 v{asset.version}）")
         return 0
+
+    if action == "discover":
+        return _cmd_asset_discover(args, lib, tracker)
 
     if action == "show":
         try:
@@ -480,6 +514,12 @@ def build_parser() -> argparse.ArgumentParser:
     a_exp.add_argument("--out", default=None, help="输出文件路径（默认当前目录/<ID>.clipasset）")
     a_imp = a_sub.add_parser("import", help="导入 .clipasset 文件（校验依赖后入库）")
     a_imp.add_argument("file")
+    a_disc = a_sub.add_parser("discover", help="资产广场：按质量分发现资产（P2 本地版）")
+    a_disc.add_argument("--tag", default="")
+    a_disc.add_argument("--type", dest="type", default="")
+    a_disc.add_argument("--limit", type=int, default=0, help="只显示前 N 个（默认全部）")
+    a_disc.add_argument("--html", action="store_true",
+                        help="生成 output/square.html 资产广场页")
 
     report_cmd = sub.add_parser("report", help="输出评测报表")
     report_cmd.add_argument("--html", action="store_true",
