@@ -61,6 +61,12 @@ python -m clip_agent run "筛选高光镜头，匹配BGM卡点" \
 
 # 4) 套用资产库调色预设（color001 = 清冷胶片感）
 python -m clip_agent run "套用调色预设" --media output/demo/demo.mp4 --asset color001 --yes
+
+# 5) 一键执行组合方案（口播净化流水线 = S001 静音裁切 → S002 字幕校对）
+python -m clip_agent run "" --combo combo001 --media output/demo/demo.mp4 --subtitle output/demo/demo.srt --yes
+
+# 6) 高光卡点流水线（S003 高光筛选 → S004 BGM 对齐）
+python -m clip_agent run "" --combo combo002 --media output/demo/demo.mp4 --bgm output/demo/bgm.m4a --yes
 ```
 
 不加 `--yes` 时进入交互决策：**[1] 应用 / [2] 修改参数重跑 / [3] 放弃**。
@@ -125,8 +131,8 @@ tests/           # pytest（ffmpeg 缺失时音视频用例自动跳过）
 
 ## 路线图
 
-- **V1.0（当前）**：5 个基础 Skill、本地调度、个人资产库、基础评测
-- **V1.1（进行中）**：✅ 资产流通（导出 `.clipasset` / 分享码 / 导入即用）；待做：Skill 组合模板、资产分享社区、多模态高光精排
+- **V1.0**：5 个基础 Skill、本地调度、个人资产库、基础评测
+- **V1.1**：✅ 资产流通（导出 `.clipasset` / 分享码 / 导入即用）+ ✅ Skill 组合模板（资产驱动执行计划）；待做：资产分享社区、多模态高光精排
 - **V1.2**：对接剪映开放 API，直接与剪映工程联动
 
 详细设计见 **[docs/SDD.md](docs/SDD.md)**。
