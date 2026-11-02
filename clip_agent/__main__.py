@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -328,6 +329,12 @@ def _cmd_skills(args) -> int:
     return 0
 
 
+def _pad(text, width: int) -> str:
+    """按终端显示宽度补空格（中文占 2 列），让质量分表对齐。"""
+    disp = sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in str(text))
+    return str(text) + " " * max(0, width - disp)
+
+
 def _cmd_asset_discover(args, lib, tracker) -> int:
     """资产广场（P2 本地先行版）：按质量分排序展示可发现资产。"""
     events = tracker.load_events()
@@ -341,13 +348,18 @@ def _cmd_asset_discover(args, lib, tracker) -> int:
     if not insights:
         print("（没有匹配的资产；可用 --tag / --type 筛选）")
         return 0
-    print(f"\n{'质量分':<7}{'ID':<11}{'名称':<18}{'来源':<10}"
-          f"{'复用素材':<9}{'本周':<6}{'收藏':<5}{'导入':<5}标签")
+    print("\n" + "".join([
+        _pad("质量分", 8), _pad("ID", 11), _pad("名称", 20), _pad("来源", 12),
+        _pad("复用素材", 10), _pad("本周", 6), _pad("收藏", 5), _pad("导入", 5), "标签",
+    ]))
     for ins in insights:
-        print(f"{ins.score:<7.1f}{ins.asset.asset_id:<11}{ins.asset.name:<18}"
-              f"{ins.badge:<10}{ins.reuse:<9}{ins.weekly_reuse:<6}"
-              f"{ins.asset.favorites:<5}{ins.asset.installs:<5}"
-              f"{','.join(ins.asset.tags)}")
+        print("".join([
+            _pad(f"{ins.score:.1f}", 8), _pad(ins.asset.asset_id, 11),
+            _pad(ins.asset.name, 20), _pad(ins.badge, 12),
+            _pad(ins.reuse, 10), _pad(ins.weekly_reuse, 6),
+            _pad(ins.asset.favorites, 5), _pad(ins.asset.installs, 5),
+            ",".join(ins.asset.tags),
+        ]))
     print("\n质量分 = 50%×去重素材复用 + 30%×收藏 + 20%×导入（0–100）；同素材重复复用只计一次")
     if args.html:
         path = write_square_html(insights, Path("output/square.html"), weekly, now=now)
