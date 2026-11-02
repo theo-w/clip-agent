@@ -28,15 +28,48 @@ def _require_tools() -> None:
         )
 
 
-def run_cmd(cmd: list) -> subprocess.CompletedProcess:
-    """执行外部命令，失败抛 MediaToolError（含 stderr 尾部信息）。"""
+def run_cmd(cmd: list, progress_total: float = None, on_progress=None) -> subprocess.CompletedProcess:
+    """执行外部命令，失败抛 MediaToolError（含 stderr 尾部信息）。
+
+    ffmpeg 命令传入 progress_total（输出总时长，秒）与 on_progress 回调时，
+    附加 -progress pipe:1 流式回报进度，on_progress 收到 0~1 的比例值。
+    """
     _require_tools()
+    if on_progress is not None and progress_total and progress_total > 0 \
+            and "ffmpeg" in cmd:
+        full_cmd = [cmd[0], "-progress", "pipe:1", "-nostats", *cmd[1:]]
+        proc = subprocess.Popen(
+            full_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        for line in proc.stdout:
+            if line.startswith("out_time="):
+                seconds = _parse_out_time(line.split("=", 1)[1].strip())
+                if seconds is not None:
+                    on_progress(min(seconds / progress_total, 1.0))
+            elif line.startswith("progress=end"):
+                on_progress(1.0)
+        proc.wait()
+        if proc.returncode != 0:
+            raise MediaToolError(
+                f"命令执行失败：{' '.join(str(c) for c in full_cmd[:4])}…"
+                f"\n{proc.stderr.read()[-1500:]}"
+            )
+        return subprocess.CompletedProcess(full_cmd, proc.returncode)
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise MediaToolError(
             f"命令执行失败：{' '.join(str(c) for c in cmd[:4])}…\n{proc.stderr[-1500:]}"
         )
     return proc
+
+
+def _parse_out_time(token: str):
+    """解析 ffmpeg -progress 的 out_time 行（如 "00:00:03.456000"）；无法解析返回 None。"""
+    m = re.fullmatch(r"(\d+):(\d+):(\d+(?:\.\d+)?)", token)
+    if not m:
+        return None
+    h, mi, s = m.groups()
+    return int(h) * 3600 + int(mi) * 60 + float(s)
 
 
 def probe_duration(path: str) -> float:

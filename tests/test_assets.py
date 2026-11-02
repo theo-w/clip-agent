@@ -160,6 +160,38 @@ def test_import_rejects_bad_format(lib, tmp_path):
         import_asset(lib, str(tmp_path / "nope.clipasset"))
 
 
+def test_import_rejects_combo_with_unknown_step(lib, tmp_path):
+    """组合方案的 steps 是隐式依赖：引用未注册 Skill 时拒绝导入。"""
+    payload = {
+        "format": "clipasset", "format_version": 1, "share_code": "CA-BAD098",
+        "asset": {
+            "asset_id": "ext12347", "asset_type": "skill_combo",
+            "name": "坏组合方案", "params": {"steps": ["S001", "S888"]},
+        },
+    }
+    _write_clipasset(tmp_path / "combo.clipasset", payload)
+    with pytest.raises(AssetImportError, match="S888"):
+        import_asset(lib, str(tmp_path / "combo.clipasset"))
+    assert all(a.asset_id != "ext12347" for a in lib.list())
+
+
+def test_import_accepts_valid_combo(lib, tmp_path):
+    payload = {
+        "format": "clipasset", "format_version": 1, "share_code": "CA-OKCMB1",
+        "asset": {
+            "asset_id": "ext12348", "asset_type": "skill_combo",
+            "name": "高光卡点", "params": {"steps": ["S003", "S004"]},
+        },
+    }
+    _write_clipasset(tmp_path / "combo_ok.clipasset", payload)
+    imported = import_asset(lib, str(tmp_path / "combo_ok.clipasset"))
+    assert imported.params == {"steps": ["S003", "S004"]}
+    # 一键执行所需的 steps 校验通过（S003/S004 均可用）
+    from clip_agent.core.intent import plan_from_combo
+    plan = plan_from_combo(imported.name, imported.params["steps"])
+    assert [s.skill_id for s in plan.steps] == ["S003", "S004"]
+
+
 def test_check_dependencies_allows_registered_skill():
     assert check_dependencies([{"skill_id": "S001", "min_version": "1.0"}]) == []
     assert check_dependencies(None) == []

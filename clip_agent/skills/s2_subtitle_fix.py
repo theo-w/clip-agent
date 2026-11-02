@@ -230,6 +230,7 @@ class SubtitleFixSkill(Skill):
             "style": params.get("style") or DEFAULT_STYLE,
         })
 
-    def render(self, ctx: ExecContext, params: dict, outputs: dict) -> list:
+    def render(self, ctx: ExecContext, params: dict, outputs: dict,
+               on_progress=None) -> list:
         path = outputs.get("fixed_subtitle")
         return [Path(path)] if path and Path(path).exists() else []

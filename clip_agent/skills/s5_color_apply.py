@@ -107,7 +107,8 @@ class ColorApplySkill(Skill):
             "source_note": source_note,
         })
 
-    def render(self, ctx: ExecContext, params: dict, outputs: dict) -> list:
+    def render(self, ctx: ExecContext, params: dict, outputs: dict,
+               on_progress=None) -> list:
         media = ctx.media_path
         chain = outputs.get("filter_chain")
         if not media or not chain:
@@ -121,5 +122,8 @@ class ColorApplySkill(Skill):
         ]
         cmd += ["-c:a", "copy"] if analyzer.has_audio(media) else []
         cmd.append(str(out))
-        analyzer.run_cmd(cmd)
+        analyzer.run_cmd(
+            cmd, progress_total=analyzer.probe_duration(media),
+            on_progress=on_progress,
+        )
         return [out]

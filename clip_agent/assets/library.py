@@ -91,6 +91,15 @@ SEED_PRESETS = [
         "created_at": "", "updated_at": "", "version": 1, "favorites": 0,
         "is_favorite": False, "is_public": True, "history": [],
     },
+    {
+        "asset_id": "combo002",
+        "asset_type": "skill_combo",
+        "name": "高光卡点流水线",
+        "params": {"steps": ["S003", "S004"]},
+        "tags": ["高光", "卡点", "流水线"],
+        "created_at": "", "updated_at": "", "version": 1, "favorites": 0,
+        "is_favorite": False, "is_public": True, "history": [],
+    },
 ]
 
 

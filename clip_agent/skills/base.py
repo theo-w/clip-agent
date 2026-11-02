@@ -24,8 +24,12 @@ class Skill:
     def run(self, ctx: ExecContext, params: dict) -> SkillResult:
         raise NotImplementedError
 
-    def render(self, ctx: ExecContext, params: dict, outputs: dict) -> list:
-        """把执行结果物化为成片文件；默认无渲染能力（方案数据即交付物）。"""
+    def render(self, ctx: ExecContext, params: dict, outputs: dict,
+               on_progress=None) -> list:
+        """把执行结果物化为成片文件；默认无渲染能力（方案数据即交付物）。
+
+        on_progress(ratio)：渲染进度回调（0~1），耗时长的实现应流式回报。
+        """
         return []
 
     def success(self, outputs: dict) -> SkillResult:

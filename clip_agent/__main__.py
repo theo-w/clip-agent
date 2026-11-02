@@ -19,14 +19,14 @@ from . import __version__
 from . import skills as skills_pkg  # noqa: F401  导入即注册内置 Skill
 from .assets.library import AssetLibrary, AssetNotFoundError
 from .assets.sharing import AssetImportError, export_asset, import_asset
-from .core.intent import IntentRouter
+from .core.intent import IntentRouter, plan_from_combo
 from .core.models import ExecContext
 from .core.registry import REGISTRY
 from .core.scheduler import Scheduler
 from .metrics.tracker import MetricsTracker
 from .preview.snapshot import PreviewSnapshot
 
-SOURCE_LABEL = {"rule": "规则路由", "llm": "本地模型路由"}
+SOURCE_LABEL = {"rule": "规则路由", "llm": "本地模型路由", "combo": "组合方案模板"}
 
 
 # ---------------------------------------------------------------- 参数工具
@@ -122,7 +122,7 @@ def _read_overrides() -> dict:
 
 
 def _render_all(plan, report, ctx) -> list:
-    """用户确认应用后，物化每个 Skill 的成片输出。"""
+    """用户确认应用后，物化每个 Skill 的成片输出（渲染时实时回报进度）。"""
     produced = []
     for step, result in zip(plan.steps, report.results):
         if not result.ok:
@@ -130,11 +130,24 @@ def _render_all(plan, report, ctx) -> list:
         skill = REGISTRY.get(step.skill_id)
         if skill is None:
             continue
+        label = f"{step.skill_id} 渲染"
+        state = {"printed": False}
+
+        def _progress(ratio):
+            if not sys.stdout.isatty():
+                return
+            state["printed"] = True
+            sys.stdout.write(f"\r  ◼ {label} {int(ratio * 100):>3}%")
+            sys.stdout.flush()
+
         try:
             merged = {**skill.meta.params, **step.params}
-            produced += skill.render(ctx, merged, result.outputs)
+            produced += skill.render(ctx, merged, result.outputs, on_progress=_progress)
         except Exception as exc:
             print(f"  ⚠ {step.skill_id} 渲染失败：{exc}")
+        finally:
+            if state["printed"]:
+                print()
     return produced
 
 
@@ -156,13 +169,35 @@ def _cmd_run(args) -> int:
         workdir=workdir,
     )
 
-    # ① 意图解析 → 执行计划
-    summary = "、".join(
-        f"{label} {Path(p).name}"
-        for label, p in (("视频", args.media), ("字幕", args.subtitle), ("BGM", args.bgm))
-        if p
-    )
-    plan = router.route(args.instruction, media_summary=summary or None)
+    # ① 意图解析 → 执行计划（或按 --combo 组合方案模板构建）
+    if args.combo:
+        try:
+            asset = AssetLibrary().get(args.combo)
+        except AssetNotFoundError:
+            print(f"✗ 资产不存在：{args.combo}")
+            return 1
+        if asset.asset_type != "skill_combo":
+            print(f"✗ 资产 {args.combo}（{asset.name}）类型为 {asset.asset_type}，"
+                  "--combo 仅支持组合方案（skill_combo）")
+            return 1
+        try:
+            plan = plan_from_combo(
+                asset.name, asset.params.get("steps") or [],
+                asset.params.get("step_params") or {},
+            )
+        except ValueError as exc:
+            print(f"✗ {exc}")
+            return 1
+    else:
+        if not args.instruction:
+            print("✗ 请提供自然语言指令，或用 --combo <组合方案ID> 执行资产模板")
+            return 1
+        summary = "、".join(
+            f"{label} {Path(p).name}"
+            for label, p in (("视频", args.media), ("字幕", args.subtitle), ("BGM", args.bgm))
+            if p
+        )
+        plan = router.route(args.instruction, media_summary=summary or None)
     print(f"◆ 意图解析（{SOURCE_LABEL.get(plan.source, plan.source)}）：{plan.intent or '未识别'}")
     if plan.explanation:
         print(f"  {plan.explanation}")
@@ -219,6 +254,9 @@ def _cmd_run(args) -> int:
     # 资产复用埋点：仅在 S005 真正成功使用预设时计入
     if args.asset and any(r.ok and r.skill_id == "S005" for r in report.results):
         tracker.track_asset("use", args.asset)
+    # 组合方案复用埋点：模板完整跑通才计入（失败/中断不计）
+    if args.combo and report.ok:
+        tracker.track_asset("use", args.combo)
 
     # ④ 应用（渲染成片）或放弃（原素材不变）
     if decision == "adopted":
@@ -369,11 +407,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
 
     run = sub.add_parser("run", help="执行一条自然语言剪辑指令")
-    run.add_argument("instruction", help='自然语言指令，如 "识别静音片段并裁剪"')
+    run.add_argument("instruction", nargs="?", default="",
+                     help='自然语言指令，如 "识别静音片段并裁剪"；或改用 --combo')
     run.add_argument("--media", help="视频/音频素材路径")
     run.add_argument("--subtitle", help="SRT 字幕文件路径")
     run.add_argument("--bgm", help="BGM 音频路径")
     run.add_argument("--asset", help="资产库预设 ID（调色等）")
+    run.add_argument("--combo", help="资产库组合方案 ID，一键执行整条流水线（如 combo001）")
     run.add_argument("--set", action="append", default=[],
                      help="参数覆盖，如 --set top_n=3，可多次")
     run.add_argument("--yes", action="store_true", help="非交互：直接采纳结果")

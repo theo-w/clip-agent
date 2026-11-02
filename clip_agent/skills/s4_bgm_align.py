@@ -57,7 +57,8 @@ class BgmAlignSkill(Skill):
         plan["target_duration"] = round(float(target), 3)
         return self.success({"bgm_plan": plan})
 
-    def render(self, ctx: ExecContext, params: dict, outputs: dict) -> list:
+    def render(self, ctx: ExecContext, params: dict, outputs: dict,
+               on_progress=None) -> list:
         plan = outputs.get("bgm_plan")
         if not ctx.bgm_path or not plan:
             return []
@@ -75,5 +76,5 @@ class BgmAlignSkill(Skill):
         if fade_start > 0:
             cmd += ["-af", f"afade=t=out:st={fade_start:.3f}:d={fade:.3f}"]
         cmd += ["-c:a", "aac", "-b:a", "192k", str(out)]
-        analyzer.run_cmd(cmd)
+        analyzer.run_cmd(cmd, progress_total=target, on_progress=on_progress)
         return [out]

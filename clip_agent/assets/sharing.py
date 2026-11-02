@@ -116,7 +116,12 @@ def import_asset(lib: AssetLibrary, file_path: str) -> Asset:
         if key not in raw:
             raise AssetImportError(f"文件缺少必要字段：{key}")
 
-    problems = check_dependencies(raw.get("dependencies") or [])
+    # 组合方案的 steps 是隐式依赖：导入时一并校验，防止"导入成功但跑不起来"
+    deps = list(raw.get("dependencies") or [])
+    if raw.get("asset_type") == "skill_combo":
+        steps = (raw.get("params") or {}).get("steps") or []
+        deps += [{"skill_id": s, "min_version": "1.0"} for s in steps]
+    problems = check_dependencies(deps)
     if problems:
         raise AssetImportError("依赖校验未通过：" + "；".join(problems))
 

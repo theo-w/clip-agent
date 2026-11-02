@@ -79,13 +79,15 @@ class SilenceCutSkill(Skill):
             )
         return self.success(outputs)
 
-    def render(self, ctx: ExecContext, params: dict, outputs: dict) -> list:
+    def render(self, ctx: ExecContext, params: dict, outputs: dict,
+               on_progress=None) -> list:
         media = ctx.media_path
         keep = [(seg["start"], seg["end"]) for seg in outputs.get("cut_time_list", [])]
         if not media or not keep:
             return []
         expr = "+".join(f"between(t,{s:.3f},{e:.3f})" for s, e in keep)
         out = Path(ctx.workdir) / f"cut_{Path(media).name}"
+        total = sum(e - s for s, e in keep)
         analyzer.run_cmd([
             "ffmpeg", "-y", "-hide_banner", "-i", media,
             "-vf", f"select='{expr}',setpts=N/FRAME_RATE/TB",
@@ -93,5 +95,5 @@ class SilenceCutSkill(Skill):
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
             str(out),
-        ])
+        ], progress_total=total, on_progress=on_progress)
         return [out]

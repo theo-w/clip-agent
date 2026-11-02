@@ -62,3 +62,17 @@ def test_silence_skill_render(demo_audio, tmp_path):
     assert len(produced) == 1
     # 渲染后时长 ≈ 0.9s（尾部静音已去除）
     assert abs(analyzer.probe_duration(str(produced[0])) - 0.9) < 0.3
+
+
+def test_silence_render_streams_progress(demo_audio, tmp_path):
+    """渲染进度流式回报（Backlog 修复）：回调单调不减，且以 100% 收尾。"""
+    skill = SilenceCutSkill()
+    ctx = ExecContext(media_path=demo_audio, workdir=tmp_path)
+    result = skill.run(ctx, skill.meta.params)
+    ratios = []
+    produced = skill.render(ctx, skill.meta.params, result.outputs,
+                            on_progress=ratios.append)
+    assert produced
+    assert ratios and ratios[-1] == 1.0
+    assert all(0.0 <= r <= 1.0 for r in ratios)
+    assert ratios == sorted(ratios)

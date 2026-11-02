@@ -110,3 +110,60 @@ def test_cli_assets_import_rejects_bad_dependency(tmp_path):
     proc = _run_cli(["assets", "import", str(bad)], data_dir=tmp_path / "lib_c")
     assert proc.returncode == 1
     assert "S999" in proc.stdout and "未静默" not in proc.stdout
+
+
+# ---------------------------------------------------------------- 组合模板（V1.1）
+
+def _demo_srt(tmp_path):
+    srt = tmp_path / "demo.srt"
+    srt.write_text(
+        "1\n00:00:00,100 --> 00:00:01,000\n大家好,今天教大家做一道家常菜.\n\n"
+        "2\n00:00:01,000 --> 00:00:02,000\n下面我们开始热油.\n\n",
+        encoding="utf-8",
+    )
+    return str(srt)
+
+
+def test_cli_run_combo_golden_path(demo_wav, tmp_path):
+    """「一句话流水线」沉淀为资产后一键执行：S001 → S002 串行跑通。"""
+    proc = _run_cli(
+        ["run", "--combo", "combo001", "--media", demo_wav,
+         "--subtitle", _demo_srt(tmp_path), "--yes", "--no-render",
+         "--workdir", str(tmp_path / "combo_out")],
+        data_dir=tmp_path / "data",
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "组合方案模板" in proc.stdout
+    content = (tmp_path / "combo_out" / "report.md").read_text(encoding="utf-8")
+    assert "S001" in content and "S002" in content
+    # 组合复用埋点：完整跑通才计入 use
+    metrics = (tmp_path / "data" / "metrics.jsonl").read_text(encoding="utf-8")
+    assert '"use"' in metrics and "combo001" in metrics
+
+
+def test_cli_combo_rejects_non_combo_asset(demo_wav, tmp_path):
+    proc = _run_cli(
+        ["run", "--combo", "color001", "--media", demo_wav,
+         "--workdir", str(tmp_path / "x")],
+        data_dir=tmp_path / "data2",
+    )
+    assert proc.returncode == 1
+    assert "skill_combo" in proc.stdout
+
+
+def test_cli_requires_instruction_or_combo(tmp_path):
+    proc = _run_cli(["run"], data_dir=tmp_path / "data3")
+    assert proc.returncode == 1
+    assert "--combo" in proc.stdout
+
+
+def test_cli_import_rejects_combo_with_unknown_step(tmp_path):
+    bad = tmp_path / "combo.clipasset"
+    bad.write_text(json.dumps({
+        "format": "clipasset", "format_version": 1, "share_code": "CA-BAD099",
+        "asset": {"asset_id": "ext99999", "asset_type": "skill_combo",
+                  "name": "坏组合", "params": {"steps": ["S001", "S888"]}},
+    }, ensure_ascii=False), encoding="utf-8")
+    proc = _run_cli(["assets", "import", str(bad)], data_dir=tmp_path / "data4")
+    assert proc.returncode == 1
+    assert "S888" in proc.stdout

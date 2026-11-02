@@ -146,6 +146,41 @@ class IntentRouter:
         )
 
 
+def plan_from_combo(name: str, steps: list, step_params: dict = None,
+                    registry: SkillRegistry = REGISTRY) -> ExecutionPlan:
+    """组合方案资产 → 执行计划（V1.1 Skill 组合模板）。
+
+    资产是参数不是代码：steps 逐一校验（未注册/已停用即拒绝执行），
+    每步参数按 Skill 认识的键过滤，未提供的参数回退 Skill 默认值。
+    """
+    if not steps:
+        raise ValueError("组合方案缺少 steps 定义（params.steps 为空）")
+    invalid = []
+    for sid in steps:
+        skill = registry.get(sid)
+        if skill is None:
+            invalid.append(f"{sid}（未注册）")
+        elif not skill.meta.is_enable:
+            invalid.append(f"{sid}（已停用）")
+    if invalid:
+        raise ValueError(
+            "组合方案引用了不可用的 Skill：" + "、".join(invalid)
+            + "。请用 `clip-agent skills` 检查，或更新/回滚该资产。"
+        )
+    plan_steps = []
+    for sid in steps:
+        skill = registry.get(sid)
+        overrides = (step_params or {}).get(sid) or {}
+        params = {k: v for k, v in overrides.items() if k in skill.meta.params}
+        plan_steps.append(PlanStep(skill_id=sid, params=params))
+    return ExecutionPlan(
+        intent=f"组合方案：{name}",
+        steps=plan_steps,
+        explanation="按资产库组合模板执行 " + " → ".join(steps),
+        source="combo",
+    )
+
+
 def _extract_params(instruction: str) -> dict:
     """规则路由的轻量参数提取：dB 阈值、前 N 个高光、静音时长下限。"""
     params = {}
