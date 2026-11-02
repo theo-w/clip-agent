@@ -18,6 +18,7 @@ class SkillMeta:
     input: list = field(default_factory=list)         # 前置依赖键
     output: list = field(default_factory=list)        # 产出键
     is_enable: bool = True
+    version: str = "1.0"          # Skill 版本号（资产依赖校验用，形如 "1.2"）
     triggers: list = field(default_factory=list)     # 规则路由触发词
 
 

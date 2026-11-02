@@ -23,6 +23,31 @@ def test_split_line_wraps_long_text():
     assert "".join(lines) == line
 
 
+def test_split_line_caps_two_lines_on_very_long_text():
+    # 两行上限是硬约束：60+ 字无标点长句也绝不能折出第三行
+    line = "这一句话完全没有标点符号并且远超两行字幕宽度的上限所以必须在保证只有两行的前提下进行硬切处理才可以"
+    assert len(line) > 40
+    lines = _split_line(line, 18)
+    assert len(lines) == 2
+    assert "".join(lines) == line
+
+
+def test_split_line_caps_two_lines_on_long_punctuated_text():
+    # 旧实现会把这句递归折成 3 行；两行上限下应恰好 2 行
+    line = "这道菜的做法非常简单,我们先把鸡蛋打散,然后加入适量的盐和葱花,搅拌均匀之后放在一边备用就行了"
+    lines = _split_line(line, 18)
+    assert len(lines) == 2
+    assert "".join(lines) == line
+
+
+def test_split_line_prefers_valid_window_cut():
+    # 30 字、标点都落在可行窗口外时，应在窗口内硬切，保证两行都 ≤ max_chars
+    line = "前,面后" + "字" * 28  # 标点只在两端，中间无可行切点
+    lines = _split_line(line, 18)
+    assert len(lines) == 2
+    assert all(len(l) <= 18 for l in lines)
+
+
 def test_fix_entries_full_pipeline(tmp_path):
     entries = [
         SubtitleEntry(1, 0.2, 1.8, "大家好,今天教大家做一道家常菜."),

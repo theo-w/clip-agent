@@ -2,6 +2,7 @@
 
 覆盖 SDD 第 4 节核心流程：指令 → 意图 → 调度 → 预览报告 → 采纳。
 """
+import json
 import os
 import shutil
 import subprocess
@@ -75,3 +76,37 @@ def test_cli_subjective_rejected(demo_wav, tmp_path):
     )
     assert proc.returncode == 1
     assert "主观创意" in proc.stdout
+
+
+def test_cli_assets_export_import(tmp_path):
+    """V1.1 流通：导出 .clipasset → 导入到另一个数据目录的资产库。"""
+    file = tmp_path / "color001.clipasset"
+    proc = _run_cli(
+        ["assets", "export", "color001", "--out", str(file)],
+        data_dir=tmp_path / "lib_a",
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert file.exists() and "分享码" in proc.stdout
+
+    proc2 = _run_cli(["assets", "import", str(file)], data_dir=tmp_path / "lib_b")
+    assert proc2.returncode == 0, proc2.stdout + proc2.stderr
+    assert "已导入资产" in proc2.stdout and "CA-" in proc2.stdout
+
+    # 导入后原资产可被检索到
+    proc3 = _run_cli(["assets", "list"], data_dir=tmp_path / "lib_b")
+    assert proc3.returncode == 0 and "清冷胶片感" in proc3.stdout
+
+
+def test_cli_assets_import_rejects_bad_dependency(tmp_path):
+    bad = tmp_path / "bad.clipasset"
+    bad.write_text(json.dumps({
+        "format": "clipasset", "format_version": 1, "share_code": "CA-BAD001",
+        "asset": {
+            "asset_id": "ext12345", "asset_type": "color_preset",
+            "name": "坏资产", "params": {},
+            "dependencies": [{"skill_id": "S999", "min_version": "1.0"}],
+        },
+    }, ensure_ascii=False), encoding="utf-8")
+    proc = _run_cli(["assets", "import", str(bad)], data_dir=tmp_path / "lib_c")
+    assert proc.returncode == 1
+    assert "S999" in proc.stdout and "未静默" not in proc.stdout

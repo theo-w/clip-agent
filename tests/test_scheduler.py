@@ -34,6 +34,18 @@ def _plan(*skill_ids):
     return ExecutionPlan(intent="t", steps=[PlanStep(sid) for sid in skill_ids])
 
 
+def test_merge_overrides_reports_unknown_params():
+    """修改参数重跑：未知参数不再被静默忽略，返回值用于提示可用参数名。"""
+    import clip_agent.skills  # noqa: F401  导入即注册内置 Skill
+    from clip_agent.__main__ import _merge_overrides
+
+    plan = ExecutionPlan(intent="t", steps=[PlanStep("S001", params={})])
+    unknown = _merge_overrides(plan, {"silence_threshold": -40, "no_such_param": 1})
+    assert "no_such_param" in unknown
+    assert "silence_threshold" not in unknown
+    assert plan.steps[0].params["silence_threshold"] == -40
+
+
 def test_sequential_run_with_intermediate():
     """A 的产出进入上下文，B 才能执行（中间结果接力）。"""
     reg = _registry(FakeSkill("A", output_key="x"), FakeSkill("B", consume=["x"]))

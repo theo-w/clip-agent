@@ -3,7 +3,7 @@
 埋点事件（JSONL 追加写入 data/metrics.jsonl）：
 - skill_run：Skill 调用、耗时、成败、错误信息
 - decision：用户决策（adopted 采纳 / modified 修改重跑 / discarded 放弃）
-- asset：资产动作（save 保存 / use 复用 / favorite 收藏）
+- asset：资产动作（save 保存 / use 复用 / favorite 收藏 / export 导出 / import 导入）
 
 报表输出 SDD 6.1 定义的三大类指标：效率 / 质量 / 生态。
 """
@@ -54,7 +54,7 @@ class MetricsTracker:
     def track_asset(self, action: str, asset_id: str) -> None:
         self._append({
             "type": "asset",
-            "action": action,  # save | use | favorite | rollback
+            "action": action,  # save | use | favorite | rollback | export | import
             "asset_id": asset_id,
         })
 
@@ -132,7 +132,8 @@ class MetricsTracker:
         lines.append(f"- 资产保存：{asset.get('save', 0)} 次")
         lines.append(f"- 资产复用：{asset.get('use', 0)} 次")
         lines.append(f"- 资产收藏：{asset.get('favorite', 0)} 次")
+        lines.append(f"- 资产导出/导入：{asset.get('export', 0)} / {asset.get('import', 0)} 次（V1.1 流通）")
 
-        if not data["skills"] and not total_dec:
+        if not data["skills"] and not total_dec and not any(asset.values()):
             lines += ["", "（暂无埋点数据，先跑几次 `clip-agent run` 再来看报表）"]
         return "\n".join(lines)

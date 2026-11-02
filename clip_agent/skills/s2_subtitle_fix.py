@@ -43,14 +43,28 @@ def _fix_punctuation(text: str) -> str:
 
 
 def _split_line(line: str, max_chars: int) -> list:
-    """超长行折行：优先在中点附近的标点处切，找不到就硬切。"""
+    """超长行折行：优先在中点附近的标点处切，找不到就硬切；最多两行。
+
+    两行上限是字幕渲染的硬约束——极长句宁可单行略超宽，也不能折出第三行。
+    """
     if len(line) <= max_chars:
         return [line]
     mid = len(line) // 2
     candidates = [m.start() + 1 for m in re.finditer(r"[，。？！；,.!?]", line)]
-    cut = min(candidates, key=lambda p: abs(p - mid)) if candidates else mid
+    # 保证两行都 ≤ max_chars 的可行切点窗口
+    lo = max(1, len(line) - max_chars)
+    hi = min(max_chars, len(line) - 1)
+    valid = [p for p in candidates if lo <= p <= hi]
+    if valid:
+        cut = min(valid, key=lambda p: abs(p - mid))
+    elif lo <= hi:
+        cut = min(max(mid, lo), hi)  # 窗口内无标点：在窗口内硬切，两行仍不超宽
+    else:
+        cut = mid  # 总长 > 2×max_chars：保两行上限，单行可能略超宽
     left, right = line[:cut].strip(), line[cut:].strip()
-    return _split_line(left, max_chars) + _split_line(right, max_chars)
+    if not left or not right:
+        return [line]
+    return [left, right]
 
 
 def fix_entries(entries: list, params: dict):

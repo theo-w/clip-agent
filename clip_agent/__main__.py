@@ -18,6 +18,7 @@ from pathlib import Path
 from . import __version__
 from . import skills as skills_pkg  # noqa: F401  导入即注册内置 Skill
 from .assets.library import AssetLibrary, AssetNotFoundError
+from .assets.sharing import AssetImportError, export_asset, import_asset
 from .core.intent import IntentRouter
 from .core.models import ExecContext
 from .core.registry import REGISTRY
@@ -55,7 +56,9 @@ def _apply_cli_overrides(plan, args) -> None:
                 step.params[k] = _coerce(v)
 
 
-def _merge_overrides(plan, overrides: dict) -> None:
+def _merge_overrides(plan, overrides: dict) -> list:
+    """把覆盖参数写进认识它的步骤；返回没有任何步骤认识的参数名。"""
+    known = set()
     for step in plan.steps:
         skill = REGISTRY.get(step.skill_id)
         if not skill:
@@ -63,6 +66,8 @@ def _merge_overrides(plan, overrides: dict) -> None:
         for k, v in overrides.items():
             if k in skill.meta.params:
                 step.params[k] = v
+                known.add(k)
+    return [k for k in overrides if k not in known]
 
 
 # ---------------------------------------------------------------- run 子命令
@@ -191,7 +196,15 @@ def _cmd_run(args) -> int:
         overrides = _read_overrides()
         if not overrides:
             continue
-        _merge_overrides(plan, overrides)
+        unknown = _merge_overrides(plan, overrides)
+        if unknown:
+            avail = set()
+            for s in plan.steps:
+                skill = REGISTRY.get(s.skill_id)
+                if skill:
+                    avail.update(skill.meta.params)
+            print(f"  ⚠ 未识别的参数：{', '.join(unknown)}（已忽略）")
+            print(f"  可用参数：{', '.join(sorted(avail)) or '无'}")
         print("\n◆ 参数已更新，重新执行...")
         report = _execute(plan, ctx, scheduler)
         report_path = snapshot.write(plan, report)
@@ -297,6 +310,46 @@ def _cmd_assets(args) -> int:
         print(f"✓ 已回滚到 v{args.version} 的参数（当前版本 v{asset.version}）")
         return 0
 
+    if action == "show":
+        try:
+            a = lib.get(args.asset_id)
+        except AssetNotFoundError:
+            print(f"✗ 资产不存在：{args.asset_id}")
+            return 1
+        print(f"ID：{a.asset_id}　名称：{a.name}　类型：{a.asset_type}　版本：v{a.version}")
+        print(f"标签：{','.join(a.tags) or '无'}　许可：{a.license}　"
+              f"分享码：{a.share_code or '（未分享，导出后生成）'}")
+        if a.dependencies:
+            deps = "、".join(
+                f"{d.get('skill_id')} ≥ v{d.get('min_version', '1.0')}" for d in a.dependencies
+            )
+            print(f"依赖：{deps}")
+        print(f"参数：{json.dumps(a.params, ensure_ascii=False)}")
+        return 0
+
+    if action == "export":
+        try:
+            out, code = export_asset(lib, args.asset_id, out=args.out)
+        except AssetNotFoundError:
+            print(f"✗ 资产不存在：{args.asset_id}")
+            return 1
+        tracker.track_asset("export", args.asset_id)
+        print(f"✓ 已导出分享文件：{out}")
+        print(f"  分享码：{code}（文件发到创作者社群，对方用 assets import 导入即用）")
+        return 0
+
+    if action == "import":
+        try:
+            asset = import_asset(lib, args.file)
+        except AssetImportError as exc:
+            print(f"✗ 导入失败：{exc}")
+            return 1
+        tracker.track_asset("import", asset.asset_id)
+        print(f"✓ 已导入资产：{asset.asset_id} {asset.name}（v{asset.version}）")
+        print(f"  参数：{json.dumps(asset.params, ensure_ascii=False)}")
+        print(f"  分享码：{asset.share_code}")
+        return 0
+
     print(f"未知操作：{action}")
     return 1
 
@@ -350,6 +403,13 @@ def build_parser() -> argparse.ArgumentParser:
     a_rb = a_sub.add_parser("rollback", help="回滚到历史版本")
     a_rb.add_argument("asset_id")
     a_rb.add_argument("version", type=int)
+    a_show = a_sub.add_parser("show", help="查看资产详情（参数/分享码/依赖）")
+    a_show.add_argument("asset_id")
+    a_exp = a_sub.add_parser("export", help="导出 .clipasset 分享文件（V1.1 流通）")
+    a_exp.add_argument("asset_id")
+    a_exp.add_argument("--out", default=None, help="输出文件路径（默认当前目录/<ID>.clipasset）")
+    a_imp = a_sub.add_parser("import", help="导入 .clipasset 文件（校验依赖后入库）")
+    a_imp.add_argument("file")
 
     sub.add_parser("report", help="输出评测报表")
     return p

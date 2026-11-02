@@ -1,17 +1,21 @@
 """创作资产库（SDD 模块 4）：调色预设 / 字幕模板 / Skill 组合的存取与版本管理。
 
 存储：data/assets.json（JSON 文件）；首次加载自动播种示例预设。
-能力：检索、标签筛选、另存为、收藏、版本回滚、导出。
+能力：检索、标签筛选、另存为、收藏、版本回滚、导入入库（分享码判重）。
 """
 from __future__ import annotations
 
 import json
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 from ..paths import data_dir
+
+
+def _asset_fields() -> set:
+    return {f.name for f in fields(Asset)}
 
 
 class AssetNotFoundError(KeyError):
@@ -32,6 +36,11 @@ class Asset:
     is_favorite: bool = False
     is_public: bool = False  # 公共优质资产（推荐），默认个人私有
     history: list = field(default_factory=list)  # 历史版本参数快照
+    # --- V1.1 流通字段（对齐 ECOSYSTEM-PLAN 第 8 节数据模型）---
+    share_code: str = ""            # 分享码（CA-XXXXX），由资产内容哈希生成
+    license: str = "free"           # 使用许可：free | attribution | paid
+    dependencies: list = field(default_factory=list)  # [{"skill_id","min_version"}]
+    installs: int = 0                # 被导入次数（流通侧统计）
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -128,7 +137,8 @@ class AssetLibrary:
     # ---------------------------------------------------------------- 写入
 
     def save(self, name: str, asset_type: str, params: dict, tags=None,
-             is_public: bool = False, asset_id: str = None) -> Asset:
+             is_public: bool = False, asset_id: str = None,
+             dependencies: list = None) -> Asset:
         """新增或更新资产；更新时自动保存历史版本。"""
         rows = self._load()
         now = _now()
@@ -144,6 +154,7 @@ class AssetLibrary:
                         "tags": tags or row.get("tags", []), "updated_at": now,
                         "version": row["version"] + 1, "history": history,
                         "is_public": is_public,
+                        **({"dependencies": dependencies} if dependencies is not None else {}),
                     }
                     self._dump(rows)
                     return Asset(**rows[i])
@@ -151,7 +162,7 @@ class AssetLibrary:
         asset = Asset(
             asset_id=uuid.uuid4().hex[:8], asset_type=asset_type, name=name,
             params=params, tags=tags or [], created_at=now, updated_at=now,
-            is_public=is_public,
+            is_public=is_public, dependencies=dependencies or [],
         )
         rows.append(asset.to_dict())
         self._dump(rows)
@@ -189,6 +200,38 @@ class AssetLibrary:
                 return Asset(**rows[i])
         raise AssetNotFoundError(asset_id)
 
-    def export(self, asset_id: str) -> str:
-        """分享导出：资产完整 JSON。"""
-        return json.dumps(self.get(asset_id).to_dict(), ensure_ascii=False, indent=2)
+    def find_by_share_code(self, share_code: str):
+        """按分享码查同源资产；未分享或不存在返回 None。"""
+        if not share_code:
+            return None
+        for row in self._load():
+            if row.get("share_code") == share_code:
+                return Asset(**row)
+        return None
+
+    def mark_shared(self, asset_id: str, share_code: str) -> Asset:
+        """记录资产的分享码（导出时调用，分享码成为资产的可追溯标识）。"""
+        rows = self._load()
+        for i, row in enumerate(rows):
+            if row["asset_id"] == asset_id:
+                rows[i]["share_code"] = share_code
+                self._dump(rows)
+                return Asset(**rows[i])
+        raise AssetNotFoundError(asset_id)
+
+    def insert_imported(self, data: dict) -> Asset:
+        """导入入库（V1.1 流通）：本地 ID 冲突时分配新 ID，导入计数 +1。
+
+        入库前经 Asset 规范化——缺失字段取默认值，保证落库行的 schema 完整
+        （否则后续版本更新会因缺 version 等字段而失败）。
+        """
+        rows = self._load()
+        asset = Asset(**{k: v for k, v in data.items() if k in _asset_fields()})
+        if any(r["asset_id"] == asset.asset_id for r in rows):
+            asset.asset_id = uuid.uuid4().hex[:8]
+        asset.created_at = asset.created_at or _now()
+        asset.updated_at = _now()
+        asset.installs += 1
+        rows.append(asset.to_dict())
+        self._dump(rows)
+        return asset

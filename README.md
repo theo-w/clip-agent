@@ -10,6 +10,7 @@
 - **自然语言指令**：`识别视频静音片段并自动裁剪`、`批量校对所有字幕错别字，统一字体样式`、`筛选高光镜头，匹配BGM卡点`
 - **5 个内置原子 Skill**（S001–S005）：独立封装、参数可配、可上下线，新增 Skill 不需要改调度核心
 - **创作资产库**：调色预设 / 字幕模板 / Skill 组合方案，支持检索、收藏、版本回滚
+- **资产流通（V1.1）**：导出 `.clipasset` 分享文件 + 分享码 → 创作者社群分发 → 导入即用（依赖校验、幂等判重、参数变更自动升级版本）
 - **评测埋点**：Skill 调用链路、耗时、采纳/修改/放弃行为 → 效率/质量/生态指标报表
 - **本地优先**：意图路由支持 Ollama 等本地模型（OpenAI 兼容接口，可选）；未配置时自动降级为关键词规则路由，纯本地也能跑
 - **零第三方依赖**：Python 标准库实现，仅依赖系统 `ffmpeg` / `ffprobe`
@@ -28,6 +29,8 @@ flowchart LR
     D -->|"修改参数重跑"| S
     D -->|"放弃"| X["结束，原素材不变"]
     S -.埋点.-> T["⑥ 数据 & 评测报表"]
+    A["资产流通 V1.1<br/>.clipasset / 分享码"] <-.导出.-> L
+    A -.导入即用（依赖校验）.-> L
 ```
 
 ## 快速开始
@@ -66,9 +69,14 @@ python -m clip_agent run "套用调色预设" --media output/demo/demo.mp4 --ass
 
 ```bash
 python -m clip_agent skills                  # Skill 清单（--disable/--enable S003 上下线）
-python -m clip_agent assets list             # 资产库（save/favorite/rollback 子命令）
+python -m clip_agent assets list            # 资产库（save/favorite/rollback 子命令）
+python -m clip_agent assets show color001   # 资产详情（参数 / 分享码 / 依赖）
+python -m clip_agent assets export color001 --out x.clipasset   # 导出分享文件
+python -m clip_agent assets import x.clipasset                  # 导入即用（校验 Skill 依赖）
 python -m clip_agent report                  # 评测报表：效率/质量/生态指标
 ```
+
+分享码由资产内容哈希生成（同内容同码）：同码同参数重复导入幂等，同码新参数自动升级为本地新版本（历史可回滚）；依赖的 Skill 未注册/停用/版本不满足时导入会明确报错，不静默入库。
 
 ## 内置 Skill 清单
 
@@ -106,7 +114,7 @@ clip_agent/
 ├── core/        # 意图路由、调度引擎、注册表、数据模型
 ├── skills/      # Skill 基类 + S001~S005（可插拔，注册即生效）
 ├── media/       # 素材识别：静音/切变/响度/SRT 解析
-├── assets/      # 创作资产库：预设 CRUD、版本回滚
+├── assets/      # 创作资产库：预设 CRUD、版本回滚、导出/导入流通
 ├── preview/     # 预览快照：report.md / preview.json
 ├── metrics/     # 埋点与评测报表
 └── __main__.py  # CLI：run / skills / assets / report
@@ -118,7 +126,7 @@ tests/           # pytest（ffmpeg 缺失时音视频用例自动跳过）
 ## 路线图
 
 - **V1.0（当前）**：5 个基础 Skill、本地调度、个人资产库、基础评测
-- **V1.1**：Skill 组合模板、资产分享、多模态高光精排
+- **V1.1（进行中）**：✅ 资产流通（导出 `.clipasset` / 分享码 / 导入即用）；待做：Skill 组合模板、资产分享社区、多模态高光精排
 - **V1.2**：对接剪映开放 API，直接与剪映工程联动
 
 详细设计见 **[docs/SDD.md](docs/SDD.md)**。

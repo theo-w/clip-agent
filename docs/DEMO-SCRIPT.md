@@ -41,10 +41,11 @@ ls output/demo/                              # 确认 demo.mp4 / demo.srt / bgm.
 
 | 考官说 | 你跑 | 讲什么 |
 |---|---|---|
-| "参数改一下再来一遍" | `... --set top_n=3 --yes` 或交互模式选 2 | 参数可覆盖、可重跑，这是"修改参数重跑"决策路径 |
+| "参数改一下再来一遍" | `... --set top_n=3 --yes` 或交互模式选 2 | 参数可覆盖、可重跑，这是"修改参数重跑"决策路径；输错参数名会提示可用参数清单 |
 | "能加个新 Skill 吗" | 口头讲 `clip_agent/skills/` 注册机制（30 行） | 新增 Skill 不改调度核心——可扩展性是 JD 要的"Skill 建设" |
 | "剪映里怎么用" | 打开 `report.md` 时间戳表 | 手动定位裁剪 + SRT 直接导入 + 调节面板数值对照 |
 | "模型在哪用" | `python -m clip_agent skills --json` | Skill 清单即模型路由的 prompt 输入（manifest） |
+| "资产怎么分享给别人" | `assets export color001 --out x.clipasset` → `assets import x.clipasset` | V1.1 流通：分享码内容哈希生成、导入校验 Skill 依赖、同码幂等判重——"资产是参数不是代码，没有可执行内容，分享链路安全"（呼应 JD"沉淀与分发"） |
 
 ## 应急方案
 

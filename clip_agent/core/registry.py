@@ -45,6 +45,7 @@ class SkillRegistry:
                 "input": s.meta.input,
                 "output": s.meta.output,
                 "is_enable": s.meta.is_enable,
+                "version": s.meta.version,
             }
             for s in self._skills.values()
         ]
