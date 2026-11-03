@@ -63,6 +63,20 @@ def test_s6_s2_chain(tmp_path, monkeypatch):
     assert "大家好，今天做一道家常菜。" in fixed.read_text(encoding="utf-8")
 
 
+def test_s6_render_accepts_progress_callback(tmp_path):
+    """render 必须对齐 Skill.render 协议（调度器会传 on_progress）。"""
+    srt = tmp_path / "transcribed.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:01,000\n你好。\n", encoding="utf-8")
+    skill = TranscribeSkill()
+    produced = skill.render(
+        ExecContext(media_path="x.mp4", workdir=tmp_path),
+        skill.meta.params,
+        {"transcribed_srt": str(srt)},
+        on_progress=lambda ratio: None,
+    )
+    assert produced == [srt]
+
+
 def test_s2_prefers_explicit_subtitle(tmp_path):
     """同时存在 --subtitle 与上游转写时，显式字幕优先。"""
     explicit = tmp_path / "explicit.srt"

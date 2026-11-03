@@ -62,6 +62,8 @@ class TranscribeSkill(Skill):
             ],
         })
 
-    def render(self, ctx: ExecContext, params: dict, outputs: dict) -> list:
+    def render(self, ctx: ExecContext, params: dict, outputs: dict,
+               on_progress=None) -> list:
+        # 纯复制产物，无渲染耗时；保留 on_progress 参数以对齐 Skill.render 协议
         path = outputs.get("transcribed_srt")
         return [Path(path)] if path and Path(path).exists() else []
