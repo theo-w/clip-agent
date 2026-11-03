@@ -90,6 +90,15 @@ def has_audio(path: str) -> bool:
     return bool(proc.stdout.strip())
 
 
+def has_video(path: str) -> bool:
+    """是否包含视频轨。"""
+    proc = run_cmd([
+        "ffprobe", "-v", "error", "-select_streams", "v",
+        "-show_entries", "stream=index", "-of", "csv=p=0", path,
+    ])
+    return bool(proc.stdout.strip())
+
+
 @dataclass
 class SilenceSegment:
     start: float

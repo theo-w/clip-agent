@@ -86,14 +86,23 @@ class SilenceCutSkill(Skill):
         if not media or not keep:
             return []
         expr = "+".join(f"between(t,{s:.3f},{e:.3f})" for s, e in keep)
-        out = Path(ctx.workdir) / f"cut_{Path(media).name}"
         total = sum(e - s for s, e in keep)
-        analyzer.run_cmd([
-            "ffmpeg", "-y", "-hide_banner", "-i", media,
-            "-vf", f"select='{expr}',setpts=N/FRAME_RATE/TB",
+        # 容器/编码跟源流一致：音频素材输出 m4a，避免把 AAC 塞进 wav 导致
+        # 不同 ffmpeg 版本对容器时长解析不一致（CI 上曾出现时长读成源素材长度）。
+        video = analyzer.has_video(media)
+        out = Path(ctx.workdir) / f"cut_{Path(media).stem}{'.mp4' if video else '.m4a'}"
+        cmd = ["ffmpeg", "-y", "-hide_banner", "-i", media]
+        if video:
+            cmd += [
+                "-vf", f"select='{expr}',setpts=N/FRAME_RATE/TB",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-pix_fmt", "yuv420p",
+            ]
+        cmd += [
             "-af", f"aselect='{expr}',asetpts=N/SR/TB",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+            "-c:a", "aac", "-b:a", "160k",
+            "-t", f"{total:.3f}",
             str(out),
-        ], progress_total=total, on_progress=on_progress)
+        ]
+        analyzer.run_cmd(cmd, progress_total=total, on_progress=on_progress)
         return [out]

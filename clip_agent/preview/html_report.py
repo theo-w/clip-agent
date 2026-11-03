@@ -17,6 +17,7 @@ from ..core.models import ExecutionPlan, ScheduleReport
 # 输出目录中的产物 → 展示名
 _ARTIFACT_LABELS = {
     "cut_demo.mp4": "静音裁剪成片",
+    "cut_demo.m4a": "静音裁剪音频（音频轨输入）",
     "fixed.srt": "校对后字幕",
     "transcribed.srt": "转写字幕",
     "bgm_aligned.m4a": "BGM 对齐音频",
