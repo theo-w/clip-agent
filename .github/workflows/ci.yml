@@ -6,10 +6,17 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.9", "3.11", "3.13"]
+        include:
+          # ubuntu-latest 已到 26.04，setup-python 无 3.9 构建，固定到 22.04
+          - python-version: "3.9"
+            os: ubuntu-22.04
+          - python-version: "3.11"
+            os: ubuntu-latest
+          - python-version: "3.13"
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
