@@ -92,7 +92,7 @@ python -m clip_agent run "用-35dB阈值识别静音，超过1秒的裁掉" \
 # 等价于 --set silence_threshold=-35 --set min_duration=1.0
 ```
 
-- **产出**：`silence_cut.json`（时间戳方案）、`cut_demo.mp4`（应用后渲染）
+- **产出**：`silence_cut.json`（时间戳方案）、`cut_demo.mp4`（视频输入）/ `cut_demo.m4a`（音频输入，避免 AAC 写进 wav 的容器时长漂移）
 - **剪映里怎么用**：按报告里的「需要删除的静音段」时间戳手动裁；或直接用渲染成片。
 
 ### S002 字幕批量校对与样式统一
@@ -312,7 +312,7 @@ output/run_20261102_185807/
 ├── report.md / report.html   # 预览报告（同源双形态）
 ├── preview.json              # 机器可读的完整结果
 ├── compare.jpg               # 调色前后对比图（S005）
-├── cut_demo.mp4              # 应用后渲染的成片
+├── cut_demo.mp4 / .m4a       # 应用后渲染的成片（音频输入为 m4a）
 ├── fixed.srt                 # 校对后字幕
 ├── bgm_aligned.m4a           # 对齐后的 BGM
 ├── transcribed.srt           # 转写字幕
