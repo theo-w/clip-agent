@@ -58,7 +58,7 @@ python -m clip_agent run "指令" [参数]
 | `--no-render` | 采纳但不渲染成片（只要方案） | |
 | `--workdir` | 自定义输出目录 | `--workdir out/test1` |
 
-其他子命令：`skills`（清单/上下线）、`assets`（资产库）、`report`（评测报表，`--html` 生成仪表盘）。
+其他子命令：`skills`（清单/上下线）、`assets`（资产库）、`export-jianying`（剪映草稿导出，见第 8 节）、`report`（评测报表，`--html` 生成仪表盘）。
 
 ## 4. Skill 总表
 
@@ -279,7 +279,33 @@ python -m clip_agent assets discover --html           # 额外生成 output/squa
 - 「本周复用资产数」取自近 7 天埋点，对应生态北极星指标。
 - 质量分与榜单均为本地数据（`data/metrics.jsonl`），在线广场/跨设备榜单需平台承载。
 
-## 8. 输出目录结构
+## 8. 剪映草稿导出（V1.2，可选依赖）
+
+把一次运行的结果写成剪映草稿，省去手工重建时间线：
+
+```bash
+pip install -e ".[jianying]"                                    # 可选依赖 pyJianYingDraft
+python -m clip_agent export-jianying output/run_20261102_123456 --dry-run
+python -m clip_agent export-jianying output/run_20261102_123456 --out output/jianying_drafts
+python -m clip_agent export-jianying output/run_xxx --name 我的口播 --replace
+```
+
+**映射规则**
+
+| 预览产物 | 草稿内容 |
+|---|---|
+| S001 `cut_time_list`（无则 S003 `highlight_segments`，再无则整段素材） | 视频轨（音频输入时为原声轨），按保留片段顺序拼接 |
+| S002 `fixed.srt` | 字幕轨；字幕时间按裁剪点重映射到成片时间轴（跨静音点的部分自动裁掉/跳过） |
+| S004 渲染产物 `bgm_aligned.m4a` | BGM 轨；没有对齐产物时用 `--bgm` 原始文件整段 |
+| S005 调色 | 只写入草稿旁的 `<草稿名>.clip_agent.json`（含剪映参数映射），不自动套用 |
+
+草稿目录结构：`<草稿名>/draft_content.json` + `draft_meta_info.json`，旁边的 `.clip_agent.json` 是完整计划（片段/字幕/BGM/调色/警告）。
+
+**边界**：macOS / Linux 只能生成草稿，**不能自动导出视频**，生成后需在 Windows 版剪映打开导出；自动导出需 Windows + 剪映 ≤6.8（第三方库限制）。未安装 `[jianying]` 时命令会提示 `pip install -e ".[jianying]"`，其他功能不受影响。
+
+**常见问题**：没有 S001/S003 的 run（如纯字幕校对）需要素材时长——导出时会用 `--media`（或 `preview.json` 记录的素材）自动探测，也可手动 `--duration`；素材路径不存在会直接报错，不生成半成品草稿。
+
+## 9. 输出目录结构
 
 ```
 output/run_20261102_185807/
@@ -295,7 +321,7 @@ output/run_20261102_185807/
 
 `output/report.html`（评测仪表盘）与 `output/square.html`（资产广场）分别在 `report --html` / `assets discover --html` 时生成。
 
-## 9. 常见问题
+## 10. 常见问题
 
 **Q：我的视频没有字幕，S002 能用吗？**
 A：先跑 S006 转写（需要 `[asr]` 可选依赖），或用剪映「识别字幕」导出 SRT 后传给 `--subtitle`。
@@ -311,3 +337,9 @@ A：核心链路完全本地、零第三方依赖；LLM 润色（可选）和语
 
 **Q：运行会不会改我的原素材？**
 A：不会。所有产物写在 `output/run_*` 下，原素材只读。
+
+**Q：导出的剪映草稿能直接打开吗？**
+A：用 `--out` 指向你的剪映草稿根目录（剪映「全局设置 → 草稿位置」）即可在剪映草稿列表看到；本机只有 macOS/Linux 时生成后需在 Windows 版剪映导出视频。
+
+**Q：S005 调色会自动应用到草稿吗？**
+A：不会。调色以剪映「调节」面板参数映射写在 `.clip_agent.json`，需要你在剪映里手动套用——不写剪映私有加密数据是刻意边界。

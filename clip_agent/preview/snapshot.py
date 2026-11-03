@@ -23,9 +23,12 @@ class PreviewSnapshot:
         self.workdir = Path(workdir)
         self.workdir.mkdir(parents=True, exist_ok=True)
 
-    def write(self, plan: ExecutionPlan, report: ScheduleReport) -> Path:
+    def write(self, plan: ExecutionPlan, report: ScheduleReport,
+              media: str = None, bgm: str = None) -> Path:
         payload = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
+            "media": media,
+            "bgm": bgm,
             "plan": {
                 "intent": plan.intent,
                 "explanation": plan.explanation,

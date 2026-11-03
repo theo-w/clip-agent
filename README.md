@@ -13,6 +13,7 @@
 - **资产流通（V1.1）**：导出 `.clipasset` 分享文件 + 分享码 → 创作者社群分发 → 导入即用（依赖校验、幂等判重、参数变更自动升级版本）
 - **资产发现（P2 本地先行版）**：`assets discover` 按质量分（去重素材复用 × 收藏 × 导入）排序资产广场，支持场景标签筛选与 `--html` 广场页；复用按「独立素材」去重，为社区榜单预留防刷口径
 - **双形态预览报告**：Markdown（可版本控制）+ HTML（可视化，单文件可分享，无需服务器）
+- **剪映草稿导出（V1.2）**：`export-jianying <run_dir>` 把一次运行的裁剪轨/字幕轨/BGM 轨写成剪映草稿，Mac/Linux 生成后在 Windows 版剪映打开导出；可选依赖 `[jianying]`，核心运行时仍零依赖
 - **评测埋点**：Skill 调用链路、耗时、采纳/修改/放弃行为 → 效率/质量/生态指标报表（文本 + HTML 仪表盘）
 - **本地优先**：意图路由支持 Ollama 等本地模型（OpenAI 兼容接口，可选）；未配置时自动降级为关键词规则路由，纯本地也能跑
 - **零第三方依赖**：Python 标准库实现，仅依赖系统 `ffmpeg` / `ffprobe`
@@ -91,6 +92,7 @@ python -m clip_agent assets show color001   # 资产详情（参数 / 分享码 
 python -m clip_agent assets export color001 --out x.clipasset   # 导出分享文件
 python -m clip_agent assets import x.clipasset                  # 导入即用（校验 Skill 依赖）
 python -m clip_agent assets discover --html                     # 资产广场：质量分排行 + output/square.html
+python -m clip_agent export-jianying output/run_xxx --out output/jianying_drafts   # 导出剪映草稿
 python -m clip_agent report                  # 评测报表：效率/质量/生态指标
 python -m clip_agent report --html           # 生成 HTML 仪表盘 output/report.html
 ```
@@ -102,6 +104,18 @@ python -m clip_agent report --html           # 生成 HTML 仪表盘 output/repo
 `report --html` 生成 `output/report.html` 仪表盘：效率/质量/生态指标与最近运行列表（可点进各次运行的 HTML 报告）。
 
 分享码由资产内容哈希生成（同内容同码）：同码同参数重复导入幂等，同码新参数自动升级为本地新版本（历史可回滚）；依赖的 Skill 未注册/停用/版本不满足时导入会明确报错，不静默入库。
+
+### 剪映草稿导出（V1.2）
+
+```bash
+pip install -e ".[jianying]"                                  # 可选依赖：pyJianYingDraft
+python -m clip_agent export-jianying output/run_xxx --dry-run  # 先看草稿计划（不写入）
+python -m clip_agent export-jianying output/run_xxx --out output/jianying_drafts
+```
+
+把该次运行的预览数据翻译成剪映草稿：S001 保留片段 → 视频轨、S002 修正字幕 → 字幕轨（按裁剪点重映射时间轴）、S004 对齐 BGM → 音频轨；S005 调色只把参数映射写入 `*.clip_agent.json`，不自动套用。草稿目录含 `draft_content.json` / `draft_meta_info.json`，可直接被剪映读取。
+
+边界（第三方库能力决定）：**macOS / Linux 只负责生成草稿，不能自动导出视频**，生成后需在 Windows 版剪映打开导出；自动导出只支持 Windows + 剪映 ≤6.8。无 `[jianying]` 依赖时 `export-jianying` 会给出明确安装提示，不影响其他命令。
 
 ## 内置 Skill 清单
 
@@ -131,7 +145,8 @@ python -m clip_agent report --html           # 生成 HTML 仪表盘 output/repo
 - 字幕输出标准 SRT（剪映可直接导入），样式参数对照剪映批量编辑；
 - 成片可直接用内置渲染（ffmpeg）生成。
 
-对接剪映开放 API 列入 V1.2 远期规划（见 [docs/SDD.md](docs/SDD.md)）。
+- **剪映草稿导出（V1.2 最小版）**：把裁剪/字幕/BGM 结果写成剪映草稿，Mac/Linux 生成 → Windows 剪映打开导出；调色参数以映射说明留档，不写剪映私有加密数据；
+- 剪映官方 2026 起已内建 Skill 化助手，本项目的定位仍是**独立、可离线、规则透明的编排验证原型**（见 [docs/RETRO.md](docs/RETRO.md)）。
 
 ## 目录结构
 
@@ -142,8 +157,9 @@ clip_agent/
 ├── media/       # 素材识别：静音/切变/响度/SRT 解析
 ├── assets/      # 创作资产库：预设 CRUD、版本回滚、导出/导入流通、质量分发现
 ├── preview/     # 预览快照：report.md / preview.json / report.html / square.html
+├── export/      # 导出层：剪映草稿（V1.2，可选依赖 [jianying]）
 ├── metrics/     # 埋点与评测报表
-└── __main__.py  # CLI：run / skills / assets / report
+└── __main__.py  # CLI：run / skills / assets / export-jianying / report
 data/            # 运行时生成：资产库、埋点、Skill 开关状态
 output/          # 每次运行的预览快照与成片
 tests/           # pytest（ffmpeg 缺失时音视频用例自动跳过）
@@ -153,7 +169,7 @@ tests/           # pytest（ffmpeg 缺失时音视频用例自动跳过）
 
 - **V1.0**：5 个基础 Skill、本地调度、个人资产库、基础评测
 - **V1.1**：✅ 资产流通（导出 `.clipasset` / 分享码 / 导入即用）+ ✅ Skill 组合模板（资产驱动执行计划）+ ✅ S006 语音转写（可选依赖）+ ✅ 双形态预览（HTML 报告与评测仪表盘）+ ✅ 本地资产广场（质量分排行/独立素材去重/HTML 广场页）；待做：在线资产广场（需平台承载）、多模态高光精排
-- **V1.2**：对接剪映开放 API，直接与剪映工程联动
+- **V1.2**：✅ 剪映草稿生成（`export-jianying`，裁剪/字幕/BGM 轨，Mac/Linux 生成 → Windows 剪映导出）；剪映官方已内建 Skill 化助手，本项目不做加密草稿读写，保持独立工具定位
 
 详细设计见 **[docs/SDD.md](docs/SDD.md)**。
 

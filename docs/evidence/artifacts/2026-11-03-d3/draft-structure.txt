@@ -1,0 +1,24 @@
+== clip_agent_run_d3_jianying
+  duration: 42.489 s
+  tracks: [('video', '剪辑轨', 5), ('text', '字幕', 5)]
+  materials: {'speeds': 5, 'texts': 5, 'videos': 1}
+  video materials: [('speech_long.mp4', 48.16)]
+  audio materials: []
+  plan: clips 5 subtitles 5 bgm False color False warnings []
+  load_template round-trip OK, duration = 42.489 s
+== clip_agent_run_d3_bgm
+  duration: 48.16 s
+  tracks: [('video', '剪辑轨', 1), ('audio', 'BGM轨', 1)]
+  materials: {'audios': 1, 'speeds': 2, 'videos': 1}
+  video materials: [('speech_long.mp4', 48.16)]
+  audio materials: [(None, 48.16)]
+  plan: clips 1 subtitles 0 bgm True color False warnings ['未找到字幕产物（S002），草稿不含字幕轨']
+  load_template round-trip OK, duration = 48.16 s
+== clip_agent_run_d3_color
+  duration: 48.16 s
+  tracks: [('video', '剪辑轨', 1)]
+  materials: {'speeds': 1, 'videos': 1}
+  video materials: [('speech_long.mp4', 48.16)]
+  audio materials: []
+  plan: clips 1 subtitles 0 bgm False color True warnings ['未找到字幕产物（S002），草稿不含字幕轨']
+  load_template round-trip OK, duration = 48.16 s

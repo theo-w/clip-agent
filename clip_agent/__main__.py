@@ -6,6 +6,7 @@
   python -m clip_agent skills                # Skill 清单（--disable/--enable 上下线）
   python -m clip_agent assets list           # 资产库
   python -m clip_agent assets discover       # 资产广场：质量分排行（--html 生成广场页）
+  python -m clip_agent export-jianying <run_dir>  # 导出剪映草稿（V1.2，需 [jianying]）
   python -m clip_agent report               # 评测报表
 """
 from __future__ import annotations
@@ -26,6 +27,7 @@ from .core.intent import IntentRouter, plan_from_combo
 from .core.models import ExecContext
 from .core.registry import REGISTRY
 from .core.scheduler import Scheduler
+from .media import analyzer
 from .metrics.tracker import MetricsTracker
 from .preview.html_report import (
     collect_recent_runs,
@@ -232,7 +234,7 @@ def _cmd_run(args) -> int:
     # ②③ 执行 → 预览快照 → 决策（修改参数可重跑）
     snapshot = PreviewSnapshot(workdir)
     report = _execute(plan, ctx, scheduler)
-    report_path = snapshot.write(plan, report)
+    report_path = snapshot.write(plan, report, media=ctx.media_path, bgm=ctx.bgm_path)
     print(f"\n◆ 预览报告：{report_path}")
     print(f"  预览数据：{workdir / 'preview.json'}")
 
@@ -264,7 +266,7 @@ def _cmd_run(args) -> int:
             print(f"  可用参数：{', '.join(sorted(avail)) or '无'}")
         print("\n◆ 参数已更新，重新执行...")
         report = _execute(plan, ctx, scheduler)
-        report_path = snapshot.write(plan, report)
+        report_path = snapshot.write(plan, report, media=ctx.media_path, bgm=ctx.bgm_path)
         print(f"\n◆ 预览报告：{report_path}")
         if not report.ok:
             print(f"\n⚠ 执行中断：{report.error}")
@@ -460,6 +462,62 @@ def _cmd_assets(args) -> int:
     return 1
 
 
+def _cmd_export_jianying(args) -> int:
+    from .export.jianying import (
+        JianyingExportError,
+        build_draft_plan,
+        describe_plan,
+        write_draft,
+    )
+
+    run_dir = Path(args.run_dir)
+    preview_file = run_dir / "preview.json"
+    if not preview_file.exists():
+        print(f"✗ run 目录缺少 preview.json：{run_dir}")
+        return 1
+    try:
+        preview = json.loads(preview_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"✗ 读取 preview.json 失败：{exc}")
+        return 1
+
+    media = args.media or preview.get("media")
+    duration = args.duration
+    if duration is None and media:
+        try:
+            duration = analyzer.probe_duration(media)
+        except analyzer.MediaToolError:
+            duration = None
+    try:
+        plan = build_draft_plan(
+            preview, run_dir, media=media, bgm=args.bgm,
+            draft_name=args.name, duration=duration,
+        )
+    except JianyingExportError as exc:
+        print(f"✗ {exc}")
+        return 1
+
+    print("◆ 剪映草稿计划")
+    for line in describe_plan(plan):
+        print(f"  {line}")
+    if args.json or args.dry_run:
+        print(json.dumps(plan.to_dict(), ensure_ascii=False, indent=2))
+    if args.dry_run:
+        print("（dry-run：未写入草稿）")
+        return 0
+
+    out = Path(args.out) if args.out else Path("output/jianying_drafts")
+    try:
+        draft_dir = write_draft(plan, out, replace=args.replace)
+    except JianyingExportError as exc:
+        print(f"✗ {exc}")
+        return 1
+    print(f"\n✓ 剪映草稿已生成：{draft_dir}")
+    print(f"  说明文件：{out / (plan.draft_name + '.clip_agent.json')}")
+    print("  macOS/Linux 只负责生成草稿；导出需在 Windows 版剪映打开（自动导出需剪映 ≤6.8）")
+    return 0
+
+
 def _cmd_report(args) -> int:
     tracker = MetricsTracker()
     print(tracker.render_report_md())
@@ -533,6 +591,20 @@ def build_parser() -> argparse.ArgumentParser:
     a_disc.add_argument("--html", action="store_true",
                         help="生成 output/square.html 资产广场页")
 
+    exp = sub.add_parser(
+        "export-jianying",
+        help="把一次 run 的预览结果导出为剪映草稿（V1.2，需 [jianying] 可选依赖）",
+    )
+    exp.add_argument("run_dir", help="run 输出目录（含 preview.json）")
+    exp.add_argument("--media", help="原始素材路径（默认取 preview.json 中记录的 media）")
+    exp.add_argument("--bgm", help="BGM 素材路径（无 S004 对齐产物时使用）")
+    exp.add_argument("--out", default="", help="剪映草稿根目录（默认 output/jianying_drafts）")
+    exp.add_argument("--name", default="", help="草稿名称（默认 clip_agent_<run 目录名>）")
+    exp.add_argument("--duration", type=float, default=None, help="素材时长（默认自动探测）")
+    exp.add_argument("--replace", action="store_true", help="允许覆盖同名草稿")
+    exp.add_argument("--json", action="store_true", help="额外打印草稿计划 JSON")
+    exp.add_argument("--dry-run", action="store_true", help="只打印计划，不写入草稿")
+
     report_cmd = sub.add_parser("report", help="输出评测报表")
     report_cmd.add_argument("--html", action="store_true",
                             help="同时生成 HTML 仪表盘 output/report.html")
@@ -546,6 +618,7 @@ def main(argv: list = None) -> int:
         "run": _cmd_run,
         "skills": _cmd_skills,
         "assets": _cmd_assets,
+        "export-jianying": _cmd_export_jianying,
         "report": _cmd_report,
     }
     handler = commands.get(args.command)

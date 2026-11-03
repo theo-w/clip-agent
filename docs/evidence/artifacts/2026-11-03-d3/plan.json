@@ -1,0 +1,64 @@
+{
+  "draft_name": "clip_agent_run_d3_jianying",
+  "media_path": "/Users/wly/剪辑辅助agent/output/demo/speech_long.mp4",
+  "width": 1920,
+  "height": 1080,
+  "clips": [
+    {
+      "source_start": 0.0,
+      "source_end": 4.404,
+      "target_start": 0.0
+    },
+    {
+      "source_start": 6.068,
+      "source_end": 11.973,
+      "target_start": 4.404
+    },
+    {
+      "source_start": 13.411,
+      "source_end": 18.559,
+      "target_start": 10.309
+    },
+    {
+      "source_start": 19.896,
+      "source_end": 27.065,
+      "target_start": 15.457
+    },
+    {
+      "source_start": 28.297,
+      "source_end": 48.16,
+      "target_start": 22.626
+    }
+  ],
+  "subtitles": [
+    {
+      "start": 0.0,
+      "end": 4.404,
+      "text": "大家好，今天演示剪辑辅\n助Ajit的完整流程。"
+    },
+    {
+      "start": 4.404,
+      "end": 10.309,
+      "text": "先识别口玻璃的静音片段，\n把停顿自动裁掉，让节奏更紧凑。"
+    },
+    {
+      "start": 10.309,
+      "end": 15.457,
+      "text": "然后校对字幕，按语意重新断句，\n最长每行16个字。"
+    },
+    {
+      "start": 15.457,
+      "end": 22.626,
+      "text": "接着给画面加一层清冷胶片感，\n并生成前后对比图，方便确认效果。"
+    },
+    {
+      "start": 22.626,
+      "end": 40.789,
+      "text": "最后把这些步骤保存成组合资产，下次一键复用，整条链路都在本地完成，不上传素材，\n也不依赖额外服务，效果不满意时，可以知预览，不落盘，这就是今天要展示的核心能力。"
+    }
+  ],
+  "bgm": null,
+  "color": {},
+  "warnings": [],
+  "duration": 42.489
+}
